@@ -1,33 +1,58 @@
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
+const crypto = require('crypto');
 const AdmZip = require('adm-zip');
 
 const root = process.cwd();
-const partsDir = path.join(root, 'deploy_parts');
+const archiveDir = path.join(root, 'archive_v2');
+const files = [
+  'chunk_00.txt',
+  'chunk_01.txt',
+  'chunk_02.txt',
+  'chunk_03.txt',
+  'rest_04_08.txt',
+];
 
-if (!fs.existsSync(partsDir)) {
-  console.log('[UNA Planner] deploy_parts not found; nothing to reconstruct.');
-  process.exit(0);
+for (const name of files) {
+  const fullPath = path.join(archiveDir, name);
+  if (!fs.existsSync(fullPath)) {
+    throw new Error(`[UNA Planner] Missing validated archive part: ${name}`);
+  }
 }
 
-const parts = fs.readdirSync(partsDir)
-  .filter((name) => name.startsWith('part_'))
-  .sort((a, b) => a.localeCompare(b, 'en', { numeric: true }));
-
-if (!parts.length) {
-  throw new Error('[UNA Planner] No archive parts found.');
-}
-
-const base64 = parts
-  .map((name) => fs.readFileSync(path.join(partsDir, name), 'utf8').trim())
+const base64 = files
+  .map((name) => fs.readFileSync(path.join(archiveDir, name), 'utf8').trim())
   .join('');
 
 const zipBuffer = Buffer.from(base64, 'base64');
-if (zipBuffer.length < 4 || zipBuffer[0] !== 0x50 || zipBuffer[1] !== 0x4b) {
-  throw new Error('[UNA Planner] Reconstructed payload is not a valid ZIP.');
+const expectedBytes = 61340;
+const expectedSha1 = 'c22220ff2bb5f62594ac248ad597018cc63e6199';
+const actualSha1 = crypto.createHash('sha1').update(zipBuffer).digest('hex');
+
+if (zipBuffer.length !== expectedBytes) {
+  throw new Error(`[UNA Planner] Archive size mismatch: expected ${expectedBytes}, got ${zipBuffer.length}.`);
 }
 
-const zip = new AdmZip(zipBuffer);
-zip.extractAllTo(root, true);
+if (actualSha1 !== expectedSha1) {
+  throw new Error(`[UNA Planner] Archive checksum mismatch: expected ${expectedSha1}, got ${actualSha1}.`);
+}
 
-console.log(`[UNA Planner] Reconstructed ${parts.length} archive parts (${zipBuffer.length} bytes).`);
+const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'una-planner-'));
+const zip = new AdmZip(zipBuffer);
+zip.extractAllTo(tempDir, true);
+
+const extractedRoot = path.join(tempDir, 'una_planner_app_v81');
+if (!fs.existsSync(path.join(extractedRoot, 'app')) || !fs.existsSync(path.join(extractedRoot, 'package.json'))) {
+  throw new Error('[UNA Planner] Valid archive extracted, but expected app root was not found.');
+}
+
+for (const name of fs.readdirSync(extractedRoot)) {
+  fs.cpSync(path.join(extractedRoot, name), path.join(root, name), {
+    recursive: true,
+    force: true,
+  });
+}
+
+fs.rmSync(tempDir, { recursive: true, force: true });
+console.log(`[UNA Planner] Validated and reconstructed full app (${zipBuffer.length} bytes, sha1 ${actualSha1}).`);
