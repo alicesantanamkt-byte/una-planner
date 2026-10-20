@@ -6,29 +6,31 @@ const AdmZip = require('adm-zip');
 const root = process.cwd();
 const partsDir = path.join(root, 'archive_v2');
 
-const orderedParts = [
-  'chunk_00.txt',
-  'chunk_01.txt',
-  'chunk_02.txt',
-  'chunk_03.txt',
-  'chunk_04.txt',
-  'chunk_05.txt',
-  'chunk_06.txt',
-  'chunk_07.txt',
-  'chunk_08_part_00.txt',
-  'chunk_08_part_01.txt',
-];
-
-for (const name of orderedParts) {
+function readText(name) {
   const fullPath = path.join(partsDir, name);
   if (!fs.existsSync(fullPath)) {
     throw new Error(`[UNA Planner] Missing archive part: ${name}`);
   }
+  return fs.readFileSync(fullPath, 'utf8').trim();
 }
 
-const base64 = orderedParts
-  .map((name) => fs.readFileSync(path.join(partsDir, name), 'utf8').trim())
-  .join('');
+function readHexText(...names) {
+  const hex = names.map(readText).join('');
+  return Buffer.from(hex, 'hex').toString('utf8');
+}
+
+const base64 = [
+  readText('chunk_00.txt'),
+  readText('chunk_01.txt'),
+  readText('chunk_02.txt'),
+  readText('chunk_03.txt'),
+  readHexText('hex04_0.txt', 'hex04_1.txt'),
+  readText('chunk_05.txt'),
+  readHexText('hex06_0.txt', 'hex06_1.txt'),
+  readText('chunk_07.txt'),
+  readText('chunk_08_part_00.txt'),
+  readText('chunk_08_part_01.txt'),
+].join('');
 
 const zipBuffer = Buffer.from(base64, 'base64');
 const expectedSize = 61340;
@@ -55,4 +57,4 @@ for (const entry of entries) {
   fs.writeFileSync(destination, entry.getData());
 }
 
-console.log(`[UNA Planner] Validated and reconstructed app from ${orderedParts.length} parts (${zipBuffer.length} bytes, sha1 ${actualSha1}).`);
+console.log(`[UNA Planner] Validated and reconstructed app (${zipBuffer.length} bytes, sha1 ${actualSha1}).`);
