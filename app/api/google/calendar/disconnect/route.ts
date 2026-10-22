@@ -14,6 +14,8 @@ export async function POST(){
     .eq("user_id",authData.user.id)
     .single();
 
+  if(!client) return NextResponse.json({error:"Cliente não encontrado."},{status:404});
+
   await supabase
     .from("calendar_connections")
     .delete()
