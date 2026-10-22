@@ -1,18 +1,20 @@
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import 'server-only';
+import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { decryptSecret, encryptSecret } from "@/lib/crypto";
-import { getAuthorizedCalendar, getGoogleOAuthClient } from "./calendar";
+import { getGoogleOAuthClient } from "./calendar";
 
 export async function getClientGoogleCalendar(clientId:string) {
-  const supabase = await createServerSupabaseClient();
+  const supabase = createAdminSupabaseClient();
   if (!supabase) throw new Error("Supabase não configurado.");
 
-  const {data:connection} = await supabase
+  const {data:connection,error} = await supabase
     .from("calendar_connections")
     .select("*")
     .eq("client_id",clientId)
     .eq("provider","google")
     .maybeSingle();
 
+  if (error) throw error;
   if (!connection) return null;
 
   const accessToken = connection.access_token_encrypted
