@@ -23,6 +23,8 @@ export async function uploadAsset(formData:FormData){
     .eq("user_id",authData.user.id)
     .single();
 
+  if(!client) throw new Error("Cliente não encontrado.");
+
   const file = formData.get("file");
   const context = String(formData.get("context") || "").slice(0,500);
   const tags = String(formData.get("tags") || "")
@@ -72,6 +74,8 @@ export async function deleteAsset(id:string){
     .eq("id",id)
     .eq("clients.user_id",authData.user.id)
     .single();
+
+  if(!asset) throw new Error("Arquivo não encontrado.");
 
   if(asset.storage_path){
     await supabase.storage.from("client-assets").remove([asset.storage_path]);
