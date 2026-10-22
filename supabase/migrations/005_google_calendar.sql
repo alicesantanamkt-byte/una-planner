@@ -65,9 +65,12 @@ with check (
   )
 );
 
-create unique index if not exists calendar_events_external_unique
-  on public.calendar_events(client_id,source,external_id)
-  where external_id is not null;
+-- A normal unique index is required for Supabase/PostgREST upsert with
+-- onConflict:"client_id,source,external_id". PostgreSQL still allows
+-- multiple NULL external_id values, so a partial index is unnecessary here.
+drop index if exists public.calendar_events_external_unique;
+create unique index calendar_events_external_unique
+  on public.calendar_events(client_id,source,external_id);
 
 alter table public.calendar_events
   add column if not exists metadata_json jsonb default '{}'::jsonb;
