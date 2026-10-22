@@ -43,6 +43,16 @@ export async function POST(){
     return NextResponse.json({error:"Não há conteúdos pendentes para comparar."},{status:400});
   }
 
+  const undescribed = (assets || []).filter(asset=>{
+    const tags = Array.isArray(asset.tags_json) ? asset.tags_json : [];
+    return !String(asset.context || "").trim() && !tags.length;
+  });
+  if(undescribed.length){
+    return NextResponse.json({
+      error:"Antes de analisar, descreva o que aparece nos materiais sem contexto e salve a descrição."
+    },{status:400});
+  }
+
   let createdCount = 0;
 
   try{
@@ -81,6 +91,6 @@ export async function POST(){
     return NextResponse.json({ok:true,matches:createdCount});
   }catch(error){
     console.error("Asset matching failed",error);
-    return NextResponse.json({error:"A análise demorou demais ou falhou. Tente novamente."},{status:500});
+    return NextResponse.json({error:"Não foi possível concluir a análise deste banco agora."},{status:500});
   }
 }
