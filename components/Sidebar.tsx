@@ -3,24 +3,43 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-const items = [
-  {label:"Hoje", href:"/app", icon:"⌂"},
-  {label:"Planejamento", href:"/app/month", icon:"▣"},
-  {label:"Produção", href:"/app/suggestions", icon:"◫"},
-  {label:"Acervo", href:"/app/assets", icon:"▤"},
-  {label:"Configurações", href:"/app/settings", icon:"⚙"}
+const groups = [
+  {label:"Hoje", href:"/app", icon:"⌂", children:[]},
+  {
+    label:"Planejamento", href:"/app/month", icon:"▣",
+    children:[
+      {label:"Meu mês",href:"/app/month"},
+      {label:"Minha agenda",href:"/app/calendar"}
+    ]
+  },
+  {
+    label:"Produção", href:"/app/suggestions", icon:"◫",
+    children:[
+      {label:"O que gravar",href:"/app/tasks"},
+      {label:"Sugestões",href:"/app/suggestions"},
+      {label:"Microcaptações",href:"/app/microcaptures"}
+    ]
+  },
+  {
+    label:"Acervo", href:"/app/assets", icon:"▤",
+    children:[
+      {label:"Banco de conteúdo",href:"/app/assets"},
+      {label:"Sugestões de uso",href:"/app/assets/matches"}
+    ]
+  },
+  {label:"Configurações", href:"/app/settings", icon:"⚙", children:[]}
 ];
 
 export function Sidebar(){
   const pathname = usePathname();
 
-  function isActive(href:string){
-    if(href==="/app") return pathname==="/app";
-    if(href==="/app/month") return pathname.startsWith("/app/month") || pathname.startsWith("/app/calendar");
-    if(href==="/app/suggestions") return pathname.startsWith("/app/suggestions") || pathname.startsWith("/app/tasks") || pathname.startsWith("/app/microcaptures");
-    if(href==="/app/assets") return pathname.startsWith("/app/assets");
-    if(href==="/app/settings") return pathname.startsWith("/app/settings");
-    return pathname.startsWith(href);
+  function exactActive(href:string){
+    return href==="/app" ? pathname==="/app" : pathname===href;
+  }
+
+  function groupActive(group:any){
+    if(group.href==="/app") return pathname==="/app";
+    return pathname===group.href || group.children.some((child:any)=>pathname.startsWith(child.href));
   }
 
   return <aside className="sidebar">
@@ -29,10 +48,19 @@ export function Sidebar(){
     </div>
 
     <nav className="nav" aria-label="Navegação principal">
-      {items.map(item=><Link key={item.href} href={item.href} className={isActive(item.href)?"active":""}>
-        <span className="nav-icon" aria-hidden="true">{item.icon}</span>
-        <span>{item.label}</span>
-      </Link>)}
+      {groups.map(group=><div className="nav-group" key={group.label}>
+        <Link href={group.href} className={`nav-parent ${groupActive(group)?"active":""}`}>
+          <span className="nav-icon" aria-hidden="true">{group.icon}</span>
+          <span>{group.label}</span>
+        </Link>
+        {group.children.length>0 && <div className="nav-children">
+          {group.children.map(child=><Link
+            key={child.href}
+            href={child.href}
+            className={exactActive(child.href)?"nav-child active-child":"nav-child"}
+          >{child.label}</Link>)}
+        </div>}
+      </div>)}
     </nav>
 
     <div className="sidebar-footer">
