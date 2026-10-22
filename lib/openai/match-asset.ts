@@ -1,11 +1,10 @@
 import { getOpenAI, getAIModel } from "./client";
 import { assetMatchSchema } from "./asset-match-schema";
 
-export async function matchAssetToContent(input:{
+export async function matchAssetToContents(input:{
   assetContext:string|null;
   assetTags:string[];
-  contentTitle:string;
-  contentMetadata:any;
+  contents:Array<{id:string;title:string;metadata_json:any}>;
 }) {
   const openai = getOpenAI();
 
@@ -16,28 +15,32 @@ export async function matchAssetToContent(input:{
       content:[{
         type:"input_text",
         text:[
-          "Avalie se um material já gravado pode ser útil para um conteúdo editorial futuro.",
+          "Avalie em lote onde um material já gravado pode ser útil entre os conteúdos editoriais abaixo.",
           `Material - contexto: ${input.assetContext || "não informado"}`,
           `Material - tags: ${input.assetTags.join(", ") || "nenhuma"}`,
-          `Conteúdo: ${input.contentTitle}`,
-          `Metadados: ${JSON.stringify(input.contentMetadata || {})}`,
           "",
+          "Conteúdos candidatos:",
+          JSON.stringify(input.contents.map(c=>({id:c.id,title:c.title,metadata:c.metadata_json || {}}))),
+          "",
+          "Retorne um item para cada conteúdo candidato, preservando exatamente o content_id recebido.",
           "Considere contexto, tema, tipo de imagem, possível b-roll e aderência natural.",
-          "Não force associação só porque há palavras parecidas.",
-          "Score alto apenas quando o reaproveitamento fizer sentido de verdade."
+          "Não force associação apenas por palavras parecidas.",
+          "Use should_use=true apenas quando houver reaproveitamento realmente útil.",
+          "Score alto apenas quando a associação fizer sentido de verdade."
         ].join("\n")
       }]
     }],
     text:{
       format:{
         type:"json_schema",
-        name:"asset_match",
+        name:"asset_match_batch",
         strict:true,
         schema:assetMatchSchema
       }
     }
   });
 
-  if(!response.output_text) return null;
-  return JSON.parse(response.output_text);
+  if(!response.output_text) return [];
+  const parsed = JSON.parse(response.output_text);
+  return Array.isArray(parsed?.matches) ? parsed.matches : [];
 }
