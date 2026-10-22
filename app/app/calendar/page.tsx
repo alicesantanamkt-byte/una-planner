@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { AppShell } from "@/components/AppShell";
 import { createManualEvent } from "./actions";
-import { DeleteEventButton } from "./DeleteEventButton";
 import { CalendarAutoRefresh } from "./CalendarAutoRefresh";
+import { CalendarMonthView } from "./CalendarMonthView";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 
@@ -39,12 +39,6 @@ function shiftMonth(year:number,month:number,offset:number){
 function dayKey(value:string){
   return new Intl.DateTimeFormat("en-CA",{
     timeZone:"America/Sao_Paulo",year:"numeric",month:"2-digit",day:"2-digit"
-  }).format(new Date(value));
-}
-
-function timeLabel(value:string){
-  return new Intl.DateTimeFormat("pt-BR",{
-    hour:"2-digit",minute:"2-digit",timeZone:"America/Sao_Paulo"
   }).format(new Date(value));
 }
 
@@ -93,102 +87,61 @@ export default async function ManualCalendar({searchParams}:{searchParams?:Promi
       .maybeSingle()
   ]);
 
-  const firstDay = new Date(`${monthKey(selected.year,selected.month)}-01T12:00:00-03:00`);
-  const firstWeekday = firstDay.getUTCDay();
-  const daysInMonth = new Date(Date.UTC(selected.year,selected.month,0,12)).getUTCDate();
-  const totalCells = Math.ceil((firstWeekday + daysInMonth)/7)*7;
-  const cells = Array.from({length:totalCells},(_,index)=>{
-    const day = index-firstWeekday+1;
-    return day >= 1 && day <= daysInMonth ? day : null;
-  });
-
-  const grouped = new Map<string,any[]>();
-  for(const event of events || []){
-    const key = dayKey(event.start_datetime);
-    if(!grouped.has(key)) grouped.set(key,[]);
-    grouped.get(key)!.push(event);
-  }
-
   const prev = shiftMonth(selected.year,selected.month,-1);
   const next = shiftMonth(selected.year,selected.month,1);
   const monthLabel = new Intl.DateTimeFormat("pt-BR",{month:"long",year:"numeric",timeZone:"UTC"})
     .format(new Date(Date.UTC(selected.year,selected.month-1,1,12)));
   const todayKey = dayKey(now.toISOString());
-  const weekdays = ["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"];
 
   return <AppShell>
     <CalendarAutoRefresh/>
-    <div className="eyebrow">Agenda</div>
-    <div className="row" style={{alignItems:"flex-end",gap:16,flexWrap:"wrap"}}>
+
+    <div className="hero-row">
       <div>
-        <h1>Minha agenda.</h1>
-        <p className="sub">Compromissos usados pelo UNA para encontrar janelas de produção.</p>
+        <div className="eyebrow">Planejamento</div>
+        <h1>Minha agenda</h1>
+        <p className="sub">Seus compromissos, gravações e microcaptações em um só lugar.</p>
       </div>
-      <div style={{display:"flex",gap:8,marginLeft:"auto",alignItems:"center"}}>
-        <Link className="btn btn-soft" href={`/app/calendar?month=${monthKey(prev.year,prev.month)}`}>←</Link>
-        <span className="btn btn-soft" style={{pointerEvents:"none",textTransform:"capitalize"}}>{monthLabel}</span>
-        <Link className="btn btn-soft" href={`/app/calendar?month=${monthKey(next.year,next.month)}`}>→</Link>
-      </div>
+      <details>
+        <summary className="btn btn-primary" style={{listStyle:"none",cursor:"pointer"}}>+ Novo compromisso</summary>
+        <div className="card" style={{position:"absolute",right:30,marginTop:8,zIndex:20,width:360,maxWidth:"calc(100vw - 40px)"}}>
+          <form action={createManualEvent}>
+            <div className="form-grid">
+              <label>Data<input name="date" type="date" required/></label>
+              <label>Título<input name="title" required/></label>
+              <label>Início<input name="start" type="time" required/></label>
+              <label>Fim<input name="end" type="time" required/></label>
+              <label>Local<input name="location"/></label>
+            </div>
+            <button className="btn btn-primary" style={{marginTop:12}}>Adicionar compromisso</button>
+          </form>
+        </div>
+      </details>
     </div>
 
-    {connection && <div className="card" style={{marginTop:18,padding:16}}>
-      <div className="row" style={{alignItems:"center",gap:10,flexWrap:"wrap"}}>
-        <strong>Google Agenda</strong>
-        <span className={connection.auto_sync_enabled ? "pill pill-ok" : "pill"}>
-          {connection.auto_sync_enabled ? "sincronização automática ativa" : "sincronização manual"}
-        </span>
-      </div>
-      <div className="meta" style={{marginTop:6}}>Última sincronização: {formatSync(connection.last_synced_at)}</div>
-    </div>}
-
-    <div className="card" style={{marginTop:18,padding:0,overflow:"hidden"}}>
-      <div style={{overflowX:"auto"}}>
-        <div style={{minWidth:840}}>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(7, minmax(0,1fr))",borderBottom:"1px solid var(--line, #e9dfd4)"}}>
-            {weekdays.map(day=><div key={day} className="meta" style={{padding:"12px 10px",textAlign:"center",fontWeight:700}}>{day}</div>)}
-          </div>
-
-          <div style={{display:"grid",gridTemplateColumns:"repeat(7, minmax(0,1fr))"}}>
-            {cells.map((day,index)=>{
-              if(!day) return <div key={`empty-${index}`} style={{minHeight:128,borderRight:"1px solid var(--line, #e9dfd4)",borderBottom:"1px solid var(--line, #e9dfd4)",background:"rgba(233,223,212,.18)"}}/>;
-
-              const key = `${monthKey(selected.year,selected.month)}-${String(day).padStart(2,"0")}`;
-              const dayEvents = grouped.get(key) || [];
-              const isToday = key === todayKey;
-
-              return <div key={key} style={{minHeight:128,padding:8,borderRight:"1px solid var(--line, #e9dfd4)",borderBottom:"1px solid var(--line, #e9dfd4)",verticalAlign:"top"}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
-                  <span style={{fontWeight:700,width:28,height:28,borderRadius:999,display:"inline-flex",alignItems:"center",justifyContent:"center",background:isToday?"#26211d":"transparent",color:isToday?"#fff":"inherit"}}>{day}</span>
-                  {dayEvents.length>0 && <span className="meta">{dayEvents.length}</span>}
-                </div>
-
-                <div style={{display:"grid",gap:5}}>
-                  {dayEvents.slice(0,4).map((e:any)=><div key={e.id} style={{border:"1px solid var(--line, #e9dfd4)",borderRadius:8,padding:"6px 7px",background:e.source==="google"?"#fbf8f3":"#fffdf9"}} title={`${e.title}${e.location ? ` · ${e.location}` : ""}`}>
-                    <div style={{fontSize:11,fontWeight:700,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{timeLabel(e.start_datetime)} · {e.title}</div>
-                    <div className="meta" style={{fontSize:10,marginTop:2}}>{e.source==="google" ? "Google" : "Manual"}</div>
-                    {e.source==="manual" && <div style={{marginTop:4}}><DeleteEventButton id={e.id}/></div>}
-                  </div>)}
-                  {dayEvents.length>4 && <div className="meta" style={{fontSize:11}}>+ {dayEvents.length-4} compromisso(s)</div>}
-                </div>
-              </div>;
-            })}
-          </div>
-        </div>
-      </div>
+    <div className="calendar-toolbar card" style={{marginTop:18}}>
+      <Link className="btn btn-soft" href={`/app/calendar?month=${monthKey(prev.year,prev.month)}`}>←</Link>
+      <div className="calendar-month-label">{monthLabel}</div>
+      <Link className="btn btn-soft" href={`/app/calendar?month=${monthKey(currentYear,currentMonth)}`}>Hoje</Link>
+      <Link className="btn btn-soft" href={`/app/calendar?month=${monthKey(next.year,next.month)}`}>→</Link>
+      {connection && <div style={{marginLeft:"auto",display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+        <span className={connection.auto_sync_enabled?"pill pill-ok":"pill"}>{connection.auto_sync_enabled?"Google sincronizado":"sincronização manual"}</span>
+        <span className="meta">Última: {formatSync(connection.last_synced_at)}</span>
+      </div>}
     </div>
 
-    <details className="card" style={{marginTop:18}}>
-      <summary style={{cursor:"pointer",fontWeight:700}}>Adicionar compromisso manual</summary>
-      <form action={createManualEvent} style={{marginTop:16}}>
-        <div className="form-grid">
-          <label>Data<input name="date" type="date" required/></label>
-          <label>Título<input name="title" required/></label>
-          <label>Início<input name="start" type="time" required/></label>
-          <label>Fim<input name="end" type="time" required/></label>
-          <label>Local<input name="location"/></label>
-        </div>
-        <button className="btn btn-primary" style={{marginTop:14}}>Adicionar compromisso</button>
-      </form>
-    </details>
+    <CalendarMonthView
+      year={selected.year}
+      month={selected.month}
+      todayKey={todayKey}
+      events={(events || []).map((event:any)=>({
+        id:event.id,
+        title:event.title,
+        start_datetime:event.start_datetime,
+        end_datetime:event.end_datetime,
+        location:event.location,
+        source:event.source
+      }))}
+    />
   </AppShell>;
 }
