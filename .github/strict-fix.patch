@@ -1,0 +1,161 @@
+--- a/app/api/assets/match/route.ts
++++ b/app/api/assets/match/route.ts
+@@ -14,6 +14,8 @@
+     .select("id")
+     .eq("user_id",authData.user.id)
+     .single();
++
++  if(!client) return NextResponse.json({error:"Cliente não encontrado."},{status:404});
+ 
+   const {data:assets} = await supabase
+     .from("content_assets")
+--- a/app/api/google/calendar/callback/route.ts
++++ b/app/api/google/calendar/callback/route.ts
+@@ -46,6 +46,10 @@
+     .eq("user_id",authData.user.id)
+     .single();
+ 
++  if(!client) {
++    return NextResponse.redirect(new URL("/app/settings?google=client_error", process.env.APP_URL));
++  }
++
+   await supabase.from("calendar_connections").upsert({
+     client_id: client.id,
+     provider: "google",
+--- a/app/api/google/calendar/disconnect/route.ts
++++ b/app/api/google/calendar/disconnect/route.ts
+@@ -14,6 +14,8 @@
+     .eq("user_id",authData.user.id)
+     .single();
+ 
++  if(!client) return NextResponse.json({error:"Cliente não encontrado."},{status:404});
++
+   await supabase
+     .from("calendar_connections")
+     .delete()
+--- a/app/api/google/calendar/sync/route.ts
++++ b/app/api/google/calendar/sync/route.ts
+@@ -15,6 +15,8 @@
+     .eq("user_id",authData.user.id)
+     .single();
+ 
++  if(!client) return NextResponse.json({error:"Cliente não encontrado."},{status:404});
++
+   const calendar = await getClientGoogleCalendar(client.id);
+   if(!calendar) return NextResponse.json({error:"Google Agenda não conectado."},{status:400});
+ 
+@@ -24,6 +26,8 @@
+     .eq("client_id",client.id)
+     .eq("provider","google")
+     .single();
++
++  if(!connection) return NextResponse.json({error:"Conexão do Google Agenda não encontrada."},{status:404});
+ 
+   let pageToken:string|undefined;
+   let nextSyncToken:string|undefined;
+--- a/app/api/microcaptures/generate/route.ts
++++ b/app/api/microcaptures/generate/route.ts
+@@ -18,12 +18,16 @@
+     .eq("user_id",authData.user.id)
+     .single();
+ 
++  if(!client) return NextResponse.json({error:"Cliente não encontrado."},{status:404});
++
+   const {data:event} = await supabase
+     .from("calendar_events")
+     .select("id,title,location,capture_allowed,protected")
+     .eq("id",eventId)
+     .eq("client_id",client.id)
+     .single();
++
++  if(!event) return NextResponse.json({error:"Evento não encontrado."},{status:404});
+ 
+   if(event.protected || !event.capture_allowed) {
+     return NextResponse.json({ok:true,skipped:true,reason:"evento protegido"});
+--- a/app/app/assets/actions.ts
++++ b/app/app/assets/actions.ts
+@@ -22,6 +22,8 @@
+     .select("id")
+     .eq("user_id",authData.user.id)
+     .single();
++
++  if(!client) throw new Error("Cliente não encontrado.");
+ 
+   const file = formData.get("file");
+   const context = String(formData.get("context") || "").slice(0,500);
+@@ -73,6 +75,8 @@
+     .eq("clients.user_id",authData.user.id)
+     .single();
+ 
++  if(!asset) throw new Error("Arquivo não encontrado.");
++
+   if(asset.storage_path){
+     await supabase.storage.from("client-assets").remove([asset.storage_path]);
+   }
+--- a/app/app/assets/matches/page.tsx
++++ b/app/app/assets/matches/page.tsx
+@@ -16,6 +16,8 @@
+     .select("id")
+     .eq("user_id",authData.user.id)
+     .single();
++
++  if(!client) redirect("/onboarding");
+ 
+   const {data:matches} = await supabase
+     .from("content_asset_matches")
+--- a/app/app/assets/page.tsx
++++ b/app/app/assets/page.tsx
+@@ -18,6 +18,8 @@
+     .select("id")
+     .eq("user_id",authData.user.id)
+     .single();
++
++  if(!client) redirect("/onboarding");
+ 
+   const {data:assets} = await supabase
+     .from("content_assets")
+--- a/app/app/microcaptures/page.tsx
++++ b/app/app/microcaptures/page.tsx
+@@ -16,6 +16,8 @@
+     .select("id")
+     .eq("user_id",authData.user.id)
+     .single();
++
++  if(!client) redirect("/onboarding");
+ 
+   const {data:suggestions} = await supabase
+     .from("micro_capture_suggestions")
+--- a/app/app/settings/page.tsx
++++ b/app/app/settings/page.tsx
+@@ -17,6 +17,8 @@
+     .select("id,recording_mode,min_free_minutes")
+     .eq("user_id",authData.user.id)
+     .single();
++
++  if(!client) redirect("/onboarding");
+ 
+   const {data:connection} = await supabase
+     .from("calendar_connections")
+--- a/app/app/suggestions/actions.ts
++++ b/app/app/suggestions/actions.ts
+@@ -108,6 +108,8 @@
+     .eq("user_id",authData.user.id)
+     .single();
+ 
++  if(!client) throw new Error("Cliente não encontrado.");
++
+   await supabase.from("alerts").insert({
+     client_id:client.id,
+     severity:"attention",
+--- a/tsconfig.json
++++ b/tsconfig.json
+@@ -26,8 +26,7 @@
+       "@/*": [
+         "./*"
+       ]
+-    },
+-    "strictNullChecks": false
++    }
+   },
+   "include": [
+     "next-env.d.ts",
