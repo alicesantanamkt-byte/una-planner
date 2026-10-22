@@ -19,6 +19,8 @@ export default async function AssetsPage(){
     .eq("user_id",authData.user.id)
     .single();
 
+  if(!client) redirect("/onboarding");
+
   const {data:assets} = await supabase
     .from("content_assets")
     .select("id,storage_path,asset_type,context,tags_json,captured_at,used_count")
