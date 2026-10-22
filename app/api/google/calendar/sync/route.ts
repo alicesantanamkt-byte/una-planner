@@ -15,6 +15,8 @@ export async function POST() {
     .eq("user_id",authData.user.id)
     .single();
 
+  if(!client) return NextResponse.json({error:"Cliente não encontrado."},{status:404});
+
   const calendar = await getClientGoogleCalendar(client.id);
   if(!calendar) return NextResponse.json({error:"Google Agenda não conectado."},{status:400});
 
@@ -24,6 +26,8 @@ export async function POST() {
     .eq("client_id",client.id)
     .eq("provider","google")
     .single();
+
+  if(!connection) return NextResponse.json({error:"Conexão do Google Agenda não encontrada."},{status:404});
 
   let pageToken:string|undefined;
   let nextSyncToken:string|undefined;
