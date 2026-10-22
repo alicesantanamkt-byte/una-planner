@@ -54,22 +54,29 @@ export default async function AssetsPage(){
         {withUrls.map((a:any)=>{
           const tags = Array.isArray(a.tags_json) ? a.tags_json : [];
           const missing = !a.context && !tags.length;
+          const editor = <form action={updateAssetMetadata.bind(null,a.id)} style={{marginTop:10}}>
+            <label>O que aparece neste material?
+              <input name="context" maxLength={500} defaultValue={a.context || ""} placeholder="Ex.: trabalhando no notebook, bastidor em casa, café na mesa..."/>
+            </label>
+            <label style={{marginTop:8}}>Tags
+              <input name="tags" defaultValue={tags.join(", ")} placeholder="bastidor, rotina, trabalho"/>
+            </label>
+            <button className="btn btn-soft" style={{marginTop:10}}>Salvar descrição</button>
+          </form>;
+
           return <div className="item" key={a.id}>
             <div className="row" style={{alignItems:"flex-start",gap:12}}>
               <div style={{flex:1,minWidth:0}}>
                 <strong>{a.context || (a.asset_type==="video" ? "Vídeo sem descrição" : "Imagem sem descrição")}</strong>
                 <div className="meta">{tags.length ? tags.join(" · ") : "sem tags"} · usado {a.used_count || 0}x</div>
                 {a.signedUrl && <a href={a.signedUrl} target="_blank" rel="noreferrer" className="meta">Abrir arquivo</a>}
-                {missing && <div className="meta" style={{marginTop:8}}>Para encontrar usos, descreva rapidamente o que aparece neste material.</div>}
-                <form action={updateAssetMetadata.bind(null,a.id)} style={{marginTop:10}}>
-                  <label>O que aparece neste material?
-                    <input name="context" maxLength={500} defaultValue={a.context || ""} placeholder="Ex.: trabalhando no notebook, bastidor em casa, café na mesa..."/>
-                  </label>
-                  <label style={{marginTop:8}}>Tags
-                    <input name="tags" defaultValue={tags.join(", ")} placeholder="bastidor, rotina, trabalho"/>
-                  </label>
-                  <button className="btn btn-soft" style={{marginTop:10}}>Salvar descrição</button>
-                </form>
+                {missing ? <>
+                  <div className="meta" style={{marginTop:8}}>Para encontrar usos, descreva rapidamente o que aparece neste material.</div>
+                  {editor}
+                </> : <details style={{marginTop:10}}>
+                  <summary className="meta" style={{cursor:"pointer",fontWeight:700}}>Editar descrição</summary>
+                  {editor}
+                </details>}
               </div>
               <form action={deleteAsset.bind(null,a.id)}>
                 <button className="btn btn-soft">Excluir</button>
