@@ -29,7 +29,7 @@ export default async function Settings(){
 
   const {data:connection} = await supabase
     .from("calendar_connections")
-    .select("id")
+    .select("id,last_synced_at,watch_expiration,auto_sync_enabled")
     .eq("client_id",client.id)
     .eq("provider","google")
     .maybeSingle();
@@ -38,7 +38,12 @@ export default async function Settings(){
     <div className="eyebrow">Preferências</div>
     <h1>Minha rotina.</h1>
 
-    <GoogleCalendarCard connected={!!connection}/>
+    <GoogleCalendarCard
+      connected={!!connection}
+      lastSyncedAt={connection?.last_synced_at || null}
+      autoSyncEnabled={connection?.auto_sync_enabled !== false}
+      watchExpiration={connection?.watch_expiration || null}
+    />
 
     <form action={saveClientSettings} className="card" style={{marginTop:18}}>
       <h3>Perfil da cliente</h3>
