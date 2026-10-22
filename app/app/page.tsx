@@ -8,11 +8,7 @@ export const dynamic = "force-dynamic";
 function saoPauloDayRange(){
   const now = new Date();
   const key = new Intl.DateTimeFormat("en-CA",{timeZone:"America/Sao_Paulo",year:"numeric",month:"2-digit",day:"2-digit"}).format(now);
-  return {
-    start:`${key}T00:00:00-03:00`,
-    end:`${key}T23:59:59-03:00`,
-    key
-  };
+  return {start:`${key}T00:00:00-03:00`,end:`${key}T23:59:59-03:00`,key};
 }
 
 function timeLabel(value:string){
@@ -24,11 +20,7 @@ function dateLabel(){
 }
 
 function greetingLabel(){
-  const parts = new Intl.DateTimeFormat("pt-BR",{
-    hour:"2-digit",
-    hourCycle:"h23",
-    timeZone:"America/Sao_Paulo"
-  }).formatToParts(new Date());
+  const parts = new Intl.DateTimeFormat("pt-BR",{hour:"2-digit",hourCycle:"h23",timeZone:"America/Sao_Paulo"}).formatToParts(new Date());
   const hour = Number(parts.find(part=>part.type==="hour")?.value || 0);
   if(hour < 12) return "Bom dia";
   if(hour < 18) return "Boa tarde";
@@ -58,38 +50,18 @@ export default async function ClientHome(){
 
   const [
     {data:todayEvents},
-    {count:pendingContentCount},
     {count:suggestionCount},
     {count:microCount},
+    {count:assetCount},
     {data:nextContents},
     {data:acceptedToday}
   ] = await Promise.all([
-    supabase
-      .from("calendar_events")
-      .select("id,title,start_datetime,end_datetime,source,metadata_json")
-      .eq("client_id",client.id)
-      .gte("start_datetime",day.start)
-      .lte("start_datetime",day.end)
-      .order("start_datetime",{ascending:true}),
-    supabase.from("content_items").select("*",{count:"exact",head:true}).eq("client_id",client.id).in("status",["pending","planned"]),
+    supabase.from("calendar_events").select("id,title,start_datetime,end_datetime,source,metadata_json").eq("client_id",client.id).gte("start_datetime",day.start).lte("start_datetime",day.end).order("start_datetime",{ascending:true}),
     supabase.from("suggested_slots").select("*",{count:"exact",head:true}).eq("client_id",client.id).eq("status","suggested"),
     supabase.from("micro_capture_suggestions").select("*",{count:"exact",head:true}).eq("client_id",client.id).eq("status","suggested"),
-    supabase
-      .from("content_items")
-      .select("id,title,format,publish_at,status")
-      .eq("client_id",client.id)
-      .in("status",["pending","planned"])
-      .not("publish_at","is",null)
-      .order("publish_at",{ascending:true})
-      .limit(3),
-    supabase
-      .from("suggested_slots")
-      .select("id,start_datetime,end_datetime,content_items(title)")
-      .eq("client_id",client.id)
-      .eq("status","accepted")
-      .gte("start_datetime",day.start)
-      .lte("start_datetime",day.end)
-      .order("start_datetime",{ascending:true})
+    supabase.from("content_assets").select("*",{count:"exact",head:true}).eq("client_id",client.id),
+    supabase.from("content_items").select("id,title,format,publish_at,status").eq("client_id",client.id).in("status",["pending","planned"]).not("publish_at","is",null).order("publish_at",{ascending:true}).limit(3),
+    supabase.from("suggested_slots").select("id,start_datetime,end_datetime,content_items(title)").eq("client_id",client.id).eq("status","accepted").gte("start_datetime",day.start).lte("start_datetime",day.end).order("start_datetime",{ascending:true})
   ]);
 
   const recordingToday = (acceptedToday || []).length;
@@ -97,28 +69,32 @@ export default async function ClientHome(){
   const greeting = greetingLabel();
 
   return <AppShell>
-    <div className="hero-row">
+    <div className="hero-row home-hero">
       <div>
         <div className="kicker-date">{dateLabel()}</div>
         <h1>{greeting}, {name}!</h1>
         <p className="sub">Aqui está o seu dia e os próximos passos da sua produção.</p>
       </div>
-      <div className="eyebrow" style={{marginBottom:6}}>conteúdo com propósito<br/>cria conexões que ficam.</div>
+      <div className="home-manifesto">conteúdo com propósito<br/>cria conexões que ficam.</div>
     </div>
 
-    <div className="grid">
-      <div className="card third stat-card">
+    <div className="home-stats">
+      <Link href="/app/tasks" className="card stat-card stat-link">
         <div className="stat-number">{recordingToday}</div>
         <div className="stat-label">conteúdo(s) para gravar hoje</div>
-      </div>
-      <div className="card third stat-card">
+      </Link>
+      <Link href="/app/microcaptures" className="card stat-card stat-link">
         <div className="stat-number">{microCount ?? 0}</div>
         <div className="stat-label">microcaptação(ões) pendente(s)</div>
-      </div>
-      <div className="card third stat-card">
+      </Link>
+      <Link href="/app/suggestions" className="card stat-card stat-link">
         <div className="stat-number">{suggestionCount ?? 0}</div>
         <div className="stat-label">horário(s) aguardando decisão</div>
-      </div>
+      </Link>
+      <Link href="/app/assets" className="card stat-card stat-link">
+        <div className="stat-number">{assetCount ?? 0}</div>
+        <div className="stat-label">material(is) no banco de conteúdo</div>
+      </Link>
     </div>
 
     <div className="today-layout">
