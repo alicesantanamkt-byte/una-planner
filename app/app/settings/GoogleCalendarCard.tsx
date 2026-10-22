@@ -9,12 +9,34 @@ export function GoogleCalendarCard({connected}:{connected:boolean}) {
   async function sync(){
     setSyncing(true);
     setMessage("");
-    const result = await fetch("/api/google/calendar/sync",{method:"POST"});
-    const data = await result.json();
-    if(result.ok) setMessage(`${data.imported ?? 0} evento(s) sincronizado(s).`);
-    else if(data.resetRequired) setMessage("A sincronização precisa ser reiniciada. Tente novamente.");
-    else setMessage(data.error || "Não foi possível sincronizar.");
-    setSyncing(false);
+
+    const controller = new AbortController();
+    const timeout = window.setTimeout(()=>controller.abort(),45000);
+
+    try {
+      const result = await fetch("/api/google/calendar/sync",{
+        method:"POST",
+        signal:controller.signal
+      });
+
+      const contentType = result.headers.get("content-type") || "";
+      const data = contentType.includes("application/json")
+        ? await result.json()
+        : {error:"A sincronização retornou uma resposta inesperada."};
+
+      if(result.ok) setMessage(`${data.imported ?? 0} evento(s) sincronizado(s).`);
+      else if(data.resetRequired) setMessage("A sincronização precisa ser reiniciada. Clique novamente em sincronizar.");
+      else setMessage(data.error || "Não foi possível sincronizar.");
+    } catch(error:any) {
+      if(error?.name==="AbortError"){
+        setMessage("A sincronização demorou mais do que o esperado. Tente novamente.");
+      } else {
+        setMessage("Não foi possível concluir a sincronização. Tente novamente.");
+      }
+    } finally {
+      window.clearTimeout(timeout);
+      setSyncing(false);
+    }
   }
 
   async function disconnect(){
