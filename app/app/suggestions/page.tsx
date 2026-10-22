@@ -19,6 +19,13 @@ function contentTitle(value:any){
   return Array.isArray(value) ? value[0]?.title : value?.title;
 }
 
+function compatibility(score:number|null|undefined){
+  const value = Number(score || 0);
+  if(value >= 85) return {label:"Ótimo encaixe",className:"pill pill-ok"};
+  if(value >= 70) return {label:"Boa compatibilidade",className:"pill pill-ok"};
+  return {label:"Possível encaixe",className:"pill pill-warn"};
+}
+
 export default async function ClientSuggestions({searchParams}:{searchParams?:Promise<{calc?:string;count?:string}>}){
   const supabase = await createServerSupabaseClient();
   if(!supabase) return <AppShell><h1>Configure o Supabase.</h1></AppShell>;
@@ -57,55 +64,66 @@ export default async function ClientSuggestions({searchParams}:{searchParams?:Pr
   const count = Number(params?.count || 0);
 
   return <AppShell>
-    <div className="eyebrow">Sugestões</div>
-    <h1>Melhores horários para gravar.</h1>
-    <p className="sub">A UNA cruza seu calendário editorial, sua rotina, seus compromissos e suas decisões anteriores para encontrar novas janelas possíveis.</p>
-
-    {calc === "ok" && <div className="card" style={{marginTop:18,padding:16}}><strong>{count} nova(s) sugestão(ões) calculada(s).</strong></div>}
-    {calc === "none" && <div className="card" style={{marginTop:18,padding:16}}><strong>Não encontrei outra janela compatível antes das datas de publicação.</strong><div className="meta" style={{marginTop:6}}>Os horários rejeitados e conteúdos já confirmados foram respeitados.</div></div>}
-    {calc === "empty" && <div className="card" style={{marginTop:18,padding:16}}><strong>Não há conteúdos pendentes com data para calcular.</strong></div>}
-    {calc === "error" && <div className="card" style={{marginTop:18,padding:16}}><strong>Não foi possível calcular agora.</strong><div className="meta" style={{marginTop:6}}>Tente novamente. Seus conteúdos e sua agenda continuam salvos.</div></div>}
-
-    <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap",marginTop:18}}>
+    <div className="hero-row">
+      <div>
+        <div className="eyebrow">Produção</div>
+        <h1>Sugestões de gravação</h1>
+        <p className="sub">Horários ideais baseados na sua agenda, rotina e decisões anteriores.</p>
+      </div>
       <form action={requestRecalculation}>
         <button className="btn btn-primary">{active.length || accepted.length ? "Recalcular horários" : "Calcular meus horários"}</button>
       </form>
-      {rejected.length>0 && <span className="meta">{rejected.length} rejeição(ões) serão consideradas no próximo cálculo.</span>}
     </div>
 
-    <div className="card" style={{marginTop:18}}>
-      <h3>Para decidir</h3>
+    {calc === "ok" && <div className="card" style={{marginTop:16,padding:14}}><strong>{count} nova(s) sugestão(ões) calculada(s).</strong></div>}
+    {calc === "none" && <div className="card" style={{marginTop:16,padding:14}}><strong>Não encontrei outra janela compatível antes das datas de publicação.</strong><div className="meta">Os horários rejeitados e conteúdos já confirmados foram respeitados.</div></div>}
+    {calc === "empty" && <div className="card" style={{marginTop:16,padding:14}}><strong>Não há conteúdos pendentes com data para calcular.</strong></div>}
+    {calc === "error" && <div className="card" style={{marginTop:16,padding:14}}><strong>Não foi possível calcular agora.</strong><div className="meta">Tente novamente. Seus conteúdos e sua agenda continuam salvos.</div></div>}
+
+    <div className="suggestion-tabs">
+      <span className="suggestion-tab active">Para decidir ({active.length})</span>
+      <span className="suggestion-tab">Confirmados ({accepted.length})</span>
+      <span className="suggestion-tab">Histórico ({rejected.length})</span>
+    </div>
+
+    <section className="card" style={{marginTop:12}}>
+      <div className="section-head">
+        <h3>Para decidir</h3>
+        {rejected.length>0 && <span className="meta">{rejected.length} rejeição(ões) já estão sendo consideradas pelo motor</span>}
+      </div>
+
       {active.length===0 && <p className="meta">Nenhuma sugestão aguardando decisão.</p>}
-      {active.map((s:any)=>{
-        const reasons = Array.isArray(s.reason_json?.reasons) ? s.reason_json.reasons : [];
-        return <div className="item" key={s.id}>
-          <div className="row" style={{alignItems:"flex-start"}}>
+      <div className="suggestion-list">
+        {active.map((s:any)=>{
+          const reasons = Array.isArray(s.reason_json?.reasons) ? s.reason_json.reasons : [];
+          const fit = compatibility(s.score);
+          const rationale = reasons.length ? reasons.join(" · ") : "Janela livre compatível com sua rotina e com o prazo deste conteúdo.";
+          return <article className="suggestion-card" key={s.id}>
             <div>
               <strong>{contentTitle(s.content_items) || "Conteúdo"}</strong>
-              <div className="meta">
-                {formatDateTime(s.start_datetime)}
-                {" · "}
-                score {s.score ?? 0}/100
-                {reasons.length ? ` · ${reasons.join(" · ")}` : ""}
-              </div>
+              <div className="meta">{formatDateTime(s.start_datetime)}</div>
+              <div className="compat"><span className={fit.className}>{fit.label}</span></div>
+              <div className="meta" style={{marginTop:7}}>{rationale}</div>
             </div>
-            <SuggestionActions id={s.id} status={s.status}/>
-          </div>
-        </div>;
-      })}
-    </div>
+            <div className="suggestion-actions">
+              <SuggestionActions id={s.id} status={s.status}/>
+            </div>
+          </article>;
+        })}
+      </div>
+    </section>
 
-    {accepted.length>0 && <div className="card" style={{marginTop:18}}>
-      <h3>Confirmados</h3>
-      {accepted.map((s:any)=><div className="item" key={s.id}>
-        <div className="row" style={{alignItems:"flex-start"}}>
+    {accepted.length>0 && <section className="card" style={{marginTop:14}}>
+      <div className="section-head"><h3>Confirmados</h3><span className="meta">Já adicionados à sua agenda</span></div>
+      <div className="suggestion-list">
+        {accepted.map((s:any)=><article className="suggestion-card" key={s.id}>
           <div>
             <strong>{contentTitle(s.content_items) || "Conteúdo"}</strong>
-            <div className="meta">{formatDateTime(s.start_datetime)} · adicionado à agenda</div>
+            <div className="meta">{formatDateTime(s.start_datetime)}</div>
           </div>
-          <span className="pill pill-ok">aceito</span>
-        </div>
-      </div>)}
-    </div>}
+          <span className="pill pill-ok">Confirmado</span>
+        </article>)}
+      </div>
+    </section>}
   </AppShell>;
 }
