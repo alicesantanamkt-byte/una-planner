@@ -1,7 +1,7 @@
 import { AppShell } from "@/components/AppShell";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import { deleteAsset } from "./actions";
+import { deleteAsset, updateAssetMetadata } from "./actions";
 import { AssetMatchButton } from "./AssetMatchButton";
 import { AssetUploadForm } from "./AssetUploadForm";
 
@@ -35,6 +35,8 @@ export default async function AssetsPage(){
     return {...a,signedUrl:data?.signedUrl || null};
   }));
 
+  const needsDescription = withUrls.some((a:any)=>!a.context && !(Array.isArray(a.tags_json)&&a.tags_json.length));
+
   return <AppShell>
     <div className="eyebrow">Acervo</div>
     <h1>Banco de conteúdo.</h1>
@@ -43,24 +45,38 @@ export default async function AssetsPage(){
     <div className="grid">
       <div className="half">
         <AssetUploadForm clientId={client.id} userId={authData.user.id}/>
-        <AssetMatchButton />
+        <AssetMatchButton hasUndescribedAssets={needsDescription}/>
       </div>
 
       <div className="card half">
         <h3>Acervo salvo</h3>
         {withUrls.length===0 && <p className="meta">Seu banco ainda está vazio. Adicione uma foto ou vídeo ao lado para começar.</p>}
-        {withUrls.map((a:any)=><div className="item" key={a.id}>
-          <div className="row" style={{alignItems:"flex-start"}}>
-            <div>
-              <strong>{a.context || (a.asset_type==="video" ? "Vídeo" : "Imagem")}</strong>
-              <div className="meta">{(Array.isArray(a.tags_json) ? a.tags_json : []).join(" · ")} · usado {a.used_count || 0}x</div>
-              {a.signedUrl && <a href={a.signedUrl} target="_blank" rel="noreferrer" className="meta">Abrir arquivo</a>}
+        {withUrls.map((a:any)=>{
+          const tags = Array.isArray(a.tags_json) ? a.tags_json : [];
+          const missing = !a.context && !tags.length;
+          return <div className="item" key={a.id}>
+            <div className="row" style={{alignItems:"flex-start",gap:12}}>
+              <div style={{flex:1,minWidth:0}}>
+                <strong>{a.context || (a.asset_type==="video" ? "Vídeo sem descrição" : "Imagem sem descrição")}</strong>
+                <div className="meta">{tags.length ? tags.join(" · ") : "sem tags"} · usado {a.used_count || 0}x</div>
+                {a.signedUrl && <a href={a.signedUrl} target="_blank" rel="noreferrer" className="meta">Abrir arquivo</a>}
+                {missing && <div className="meta" style={{marginTop:8}}>Para encontrar usos, descreva rapidamente o que aparece neste material.</div>}
+                <form action={updateAssetMetadata.bind(null,a.id)} style={{marginTop:10}}>
+                  <label>O que aparece neste material?
+                    <input name="context" maxLength={500} defaultValue={a.context || ""} placeholder="Ex.: trabalhando no notebook, bastidor em casa, café na mesa..."/>
+                  </label>
+                  <label style={{marginTop:8}}>Tags
+                    <input name="tags" defaultValue={tags.join(", ")} placeholder="bastidor, rotina, trabalho"/>
+                  </label>
+                  <button className="btn btn-soft" style={{marginTop:10}}>Salvar descrição</button>
+                </form>
+              </div>
+              <form action={deleteAsset.bind(null,a.id)}>
+                <button className="btn btn-soft">Excluir</button>
+              </form>
             </div>
-            <form action={deleteAsset.bind(null,a.id)}>
-              <button className="btn btn-soft">Excluir</button>
-            </form>
-          </div>
-        </div>)}
+          </div>;
+        })}
       </div>
     </div>
   </AppShell>;
