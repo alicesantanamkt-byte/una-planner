@@ -2,7 +2,7 @@ import Link from "next/link";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { importSpreadsheet } from "./actions";
 
-type SearchParams = Promise<{imported?:string; error?:string; message?:string}>;
+type SearchParams = Promise<{imported?:string; skipped?:string; error?:string; message?:string}>;
 
 export default async function ImportPage({searchParams}:{searchParams:SearchParams}){
   const params = await searchParams;
@@ -29,14 +29,19 @@ export default async function ImportPage({searchParams}:{searchParams:SearchPara
         ? "Não foi possível importar a planilha. Confira o arquivo e tente novamente."
         : "";
 
+  const imported=Number(params.imported || 0);
+  const skipped=Number(params.skipped || 0);
+
   return <>
     <div className="eyebrow">Importação</div>
     <h1>Importar calendário editorial.</h1>
     <p className="sub">Arquivos estruturados entram pelo parser. PDFs passam por IA e revisão humana.</p>
 
     {params.imported && <div className="card" style={{marginTop:18,borderColor:"#b7c5a4"}}>
-      <strong>{params.imported} conteúdo(s) importado(s) com sucesso.</strong>
-      <div className="meta">Eles já devem aparecer em Meu mês e O que gravar.</div>
+      <strong>{imported} conteúdo(s) novo(s) importado(s).</strong>
+      <div className="meta">
+        {skipped>0 ? `${skipped} item(ns) igual(is) já existentes foram ignorados para evitar duplicação.` : "Eles já devem aparecer em Meu mês e O que gravar."}
+      </div>
     </div>}
 
     {errorMessage && <div className="card" style={{marginTop:18,borderColor:"#d9a5a5"}}>
