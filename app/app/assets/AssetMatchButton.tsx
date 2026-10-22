@@ -3,17 +3,22 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-export function AssetMatchButton(){
+export function AssetMatchButton({hasUndescribedAssets=false}:{hasUndescribedAssets?:boolean}){
   const [loading,setLoading]=useState(false);
   const [message,setMessage]=useState("");
   const router=useRouter();
 
   async function run(){
+    if(hasUndescribedAssets){
+      setMessage("Antes de analisar, descreva o que aparece nos materiais sem contexto e salve a descrição.");
+      return;
+    }
+
     setLoading(true);
     setMessage("");
 
     const controller=new AbortController();
-    const timeout=window.setTimeout(()=>controller.abort(),55000);
+    const timeout=window.setTimeout(()=>controller.abort(),45000);
 
     try{
       const res = await fetch("/api/assets/match",{method:"POST",signal:controller.signal});
@@ -23,7 +28,7 @@ export function AssetMatchButton(){
       if(res.ok){
         const count=Number(data.matches || 0);
         setMessage(count
-          ? `${count} sugestão(ões) de uso encontrada(s).`
+          ? `${count} sugestão(ões) de uso encontrada(s). Abra “Sugestões de uso” para ver os encaixes.`
           : "Analisei seu banco, mas não encontrei uma associação forte o suficiente com os conteúdos atuais.");
         router.refresh();
       }else{
@@ -31,7 +36,7 @@ export function AssetMatchButton(){
       }
     }catch(error:any){
       if(error?.name==="AbortError"){
-        setMessage("A análise demorou mais do que o esperado. Tente novamente.");
+        setMessage("A análise não terminou a tempo. Verifique se todos os materiais têm descrição e tente novamente.");
       }else{
         setMessage("Não foi possível concluir a análise. Tente novamente.");
       }
