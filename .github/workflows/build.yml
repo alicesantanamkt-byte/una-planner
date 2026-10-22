@@ -2,7 +2,7 @@ name: Build UNA Planner
 
 on:
   push:
-    branches: [build-fix]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -17,18 +17,23 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Apply strict TypeScript guards
+        run: |
+          if git apply --check .github/strict-fix.patch; then
+            git apply .github/strict-fix.patch
+          else
+            echo "Strict safety patch already applied or not applicable."
+          fi
       - name: Install dependencies
         run: npm install
-      - name: Hydrate real source tree
+      - name: Build with strict TypeScript
+        run: npm run build
+      - name: Commit validated strict fixes
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add app components lib supabase package.json tsconfig.json next.config.ts proxy.ts README.md BETA_CHECKLIST.md QA_TEST_PLAN.md TEST_REPORT.md
-          git add -f .env.example
-          git rm -r --ignore-unmatch archive_v2 deploy_parts scripts .ci-trigger
+          git add app tsconfig.json
           if ! git diff --cached --quiet; then
-            git commit -m "Hydrate UNA Planner source tree"
-            git push origin HEAD:build-fix
+            git commit -m "Harden null handling and restore strict TypeScript"
+            git push origin HEAD:main
           fi
-      - name: Build
-        run: npm run build
