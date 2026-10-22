@@ -17,6 +17,8 @@ export default async function MatchesPage(){
     .eq("user_id",authData.user.id)
     .single();
 
+  if(!client) redirect("/onboarding");
+
   const {data:matches} = await supabase
     .from("content_asset_matches")
     .select("id,score,reason,suggested_usage,content_assets(context,tags_json,client_id),content_items(title)")
