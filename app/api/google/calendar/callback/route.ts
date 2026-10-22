@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { exchangeCodeForTokens } from "@/lib/google/calendar";
 import { encryptSecret } from "@/lib/crypto";
+import { syncClientGoogleCalendar } from "@/lib/google/sync-client-calendar";
+import { ensureGoogleCalendarWatch } from "@/lib/google/calendar-watch";
 
 export async function GET(request:NextRequest) {
   const supabase = await createServerSupabaseClient();
@@ -11,12 +13,8 @@ export async function GET(request:NextRequest) {
   const state = request.nextUrl.searchParams.get("state");
   const error = request.nextUrl.searchParams.get("error");
 
-  if (error) {
-    return NextResponse.redirect(new URL("/app/settings?google=denied", process.env.APP_URL));
-  }
-  if (!code || !state) {
-    return NextResponse.redirect(new URL("/app/settings?google=invalid", process.env.APP_URL));
-  }
+  if (error) return NextResponse.redirect(new URL("/app/settings?google=denied", process.env.APP_URL));
+  if (!code || !state) return NextResponse.redirect(new URL("/app/settings?google=invalid", process.env.APP_URL));
 
   const {data:authData} = await supabase.auth.getUser();
   if (!authData.user) return NextResponse.redirect(new URL("/login", process.env.APP_URL));
@@ -29,14 +27,11 @@ export async function GET(request:NextRequest) {
     .eq("user_id",authData.user.id)
     .maybeSingle();
 
-  if (!stateRow) {
-    return NextResponse.redirect(new URL("/app/settings?google=state_error", process.env.APP_URL));
-  }
+  if (!stateRow) return NextResponse.redirect(new URL("/app/settings?google=state_error", process.env.APP_URL));
 
   await supabase.from("oauth_states").delete().eq("id",stateRow.id);
 
   const tokens = await exchangeCodeForTokens(code);
-
   const encryptedAccess = tokens.access_token ? encryptSecret(tokens.access_token) : null;
   const encryptedRefresh = tokens.refresh_token ? encryptSecret(tokens.refresh_token) : null;
 
@@ -46,19 +41,27 @@ export async function GET(request:NextRequest) {
     .eq("user_id",authData.user.id)
     .single();
 
-  if(!client) {
-    return NextResponse.redirect(new URL("/app/settings?google=client_error", process.env.APP_URL));
-  }
+  if(!client) return NextResponse.redirect(new URL("/app/settings?google=client_error", process.env.APP_URL));
 
-  await supabase.from("calendar_connections").upsert({
+  const {error:upsertError}=await supabase.from("calendar_connections").upsert({
     client_id: client.id,
     provider: "google",
     access_token_encrypted: encryptedAccess,
     refresh_token_encrypted: encryptedRefresh,
     expiry_date: tokens.expiry_date || null,
     scope: tokens.scope || null,
-    connected_at: new Date().toISOString()
+    connected_at: new Date().toISOString(),
+    auto_sync_enabled:true
   }, { onConflict: "client_id,provider" });
+
+  if(upsertError) return NextResponse.redirect(new URL("/app/settings?google=save_error", process.env.APP_URL));
+
+  try{
+    await syncClientGoogleCalendar(client.id);
+    await ensureGoogleCalendarWatch(client.id);
+  }catch(error){
+    console.error("Initial Google Calendar automatic sync setup failed",error);
+  }
 
   return NextResponse.redirect(new URL("/app/settings?google=connected", process.env.APP_URL));
 }
