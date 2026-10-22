@@ -46,7 +46,7 @@ export async function uploadAsset(formData:FormData){
 
   if(uploadError) throw uploadError;
 
-  await supabase.from("content_assets").insert({
+  const {error:insertError} = await supabase.from("content_assets").insert({
     client_id:client.id,
     uploaded_by:authData.user.id,
     file_url:null,
@@ -58,7 +58,45 @@ export async function uploadAsset(formData:FormData){
     consent_status:"self_owned"
   });
 
+  if(insertError){
+    await supabase.storage.from("client-assets").remove([path]);
+    throw insertError;
+  }
+
   revalidatePath("/app/assets");
+}
+
+export async function updateAssetMetadata(id:string, formData:FormData){
+  const supabase = await createServerSupabaseClient();
+  if(!supabase) throw new Error("Supabase não configurado.");
+
+  const {data:authData} = await supabase.auth.getUser();
+  if(!authData.user) redirect("/login");
+
+  const context = String(formData.get("context") || "").trim().slice(0,500);
+  const tags = String(formData.get("tags") || "")
+    .split(",")
+    .map(v=>v.trim().slice(0,50))
+    .filter(Boolean)
+    .slice(0,20);
+
+  const {data:asset} = await supabase
+    .from("content_assets")
+    .select("id,client_id,clients!inner(user_id)")
+    .eq("id",id)
+    .eq("clients.user_id",authData.user.id)
+    .maybeSingle();
+
+  if(!asset) throw new Error("Material não encontrado.");
+
+  const {error} = await supabase
+    .from("content_assets")
+    .update({context:context || null,tags_json:tags})
+    .eq("id",id);
+  if(error) throw error;
+
+  revalidatePath("/app/assets");
+  revalidatePath("/app/assets/matches");
 }
 
 export async function deleteAsset(id:string){
