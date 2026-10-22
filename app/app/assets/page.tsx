@@ -1,8 +1,9 @@
 import { AppShell } from "@/components/AppShell";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import { uploadAsset, deleteAsset } from "./actions";
+import { deleteAsset } from "./actions";
 import { AssetMatchButton } from "./AssetMatchButton";
+import { AssetUploadForm } from "./AssetUploadForm";
 
 export const dynamic = "force-dynamic";
 
@@ -41,30 +42,18 @@ export default async function AssetsPage(){
 
     <div className="grid">
       <div className="half">
-        <form action={uploadAsset} className="card">
-          <h3>Adicionar material</h3>
-          <label>Foto ou vídeo
-            <input name="file" type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime,video/webm" required/>
-          </label>
-          <label style={{marginTop:12}}>Contexto
-            <input name="context" maxLength={500} placeholder="Ex.: preparação de procedimento"/>
-          </label>
-          <label style={{marginTop:12}}>Tags
-            <input name="tags" placeholder="bastidor, clínica, autoridade"/>
-          </label>
-          <button className="btn btn-primary" style={{marginTop:16}}>Salvar no banco</button>
-        </form>
+        <AssetUploadForm clientId={client.id} userId={authData.user.id}/>
         <AssetMatchButton />
       </div>
 
       <div className="card half">
         <h3>Acervo salvo</h3>
-        {withUrls.length===0 && <p className="meta">Seu banco ainda está vazio.</p>}
+        {withUrls.length===0 && <p className="meta">Seu banco ainda está vazio. Adicione uma foto ou vídeo ao lado para começar.</p>}
         {withUrls.map((a:any)=><div className="item" key={a.id}>
           <div className="row" style={{alignItems:"flex-start"}}>
             <div>
               <strong>{a.context || (a.asset_type==="video" ? "Vídeo" : "Imagem")}</strong>
-              <div className="meta">{(a.tags_json || []).join(" · ")} · usado {a.used_count || 0}x</div>
+              <div className="meta">{(Array.isArray(a.tags_json) ? a.tags_json : []).join(" · ")} · usado {a.used_count || 0}x</div>
               {a.signedUrl && <a href={a.signedUrl} target="_blank" rel="noreferrer" className="meta">Abrir arquivo</a>}
             </div>
             <form action={deleteAsset.bind(null,a.id)}>
