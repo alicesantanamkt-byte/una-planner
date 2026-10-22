@@ -2,7 +2,6 @@
   "name": "una-planner",
   "private": true,
   "scripts": {
-    "postinstall": "node scripts/reconstruct-app.cjs",
     "dev": "next dev",
     "build": "next build",
     "start": "next start"
@@ -15,8 +14,7 @@
     "@supabase/supabase-js": "latest",
     "xlsx": "latest",
     "googleapis": "latest",
-    "openai": "latest",
-    "adm-zip": "latest"
+    "openai": "latest"
   },
   "devDependencies": {
     "typescript": "latest",
