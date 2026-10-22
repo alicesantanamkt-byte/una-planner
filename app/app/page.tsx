@@ -23,6 +23,18 @@ function dateLabel(){
   return new Intl.DateTimeFormat("pt-BR",{weekday:"long",day:"2-digit",month:"long",year:"numeric",timeZone:"America/Sao_Paulo"}).format(new Date());
 }
 
+function greetingLabel(){
+  const parts = new Intl.DateTimeFormat("pt-BR",{
+    hour:"2-digit",
+    hourCycle:"h23",
+    timeZone:"America/Sao_Paulo"
+  }).formatToParts(new Date());
+  const hour = Number(parts.find(part=>part.type==="hour")?.value || 0);
+  if(hour < 12) return "Bom dia";
+  if(hour < 18) return "Boa tarde";
+  return "Boa noite";
+}
+
 function firstName(value:string|null|undefined){
   return String(value || "").trim().split(/\s+/)[0] || "você";
 }
@@ -81,14 +93,14 @@ export default async function ClientHome(){
   ]);
 
   const recordingToday = (acceptedToday || []).length;
-  const editingCount = Math.max(0,Math.min(9,(pendingContentCount || 0)-recordingToday));
   const name = firstName(client.display_name || authData.user.user_metadata?.name);
+  const greeting = greetingLabel();
 
   return <AppShell>
     <div className="hero-row">
       <div>
         <div className="kicker-date">{dateLabel()}</div>
-        <h1>Bom dia, {name}!</h1>
+        <h1>{greeting}, {name}!</h1>
         <p className="sub">Aqui está o seu dia e os próximos passos da sua produção.</p>
       </div>
       <div className="eyebrow" style={{marginBottom:6}}>conteúdo com propósito<br/>cria conexões que ficam.</div>
