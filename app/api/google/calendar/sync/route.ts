@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getClientGoogleCalendar } from "@/lib/google/client-connection";
 
+export const maxDuration = 60;
+
 export async function POST() {
   const supabase = await createServerSupabaseClient();
   if(!supabase) return NextResponse.json({error:"Supabase não configurado."},{status:500});
@@ -32,9 +34,12 @@ export async function POST() {
   let pageToken:string|undefined;
   let nextSyncToken:string|undefined;
   let imported = 0;
+  let pages = 0;
 
   try {
     do {
+      const initialSync = !connection.sync_token;
+      const now = Date.now();
       const result = await calendar.events.list({
         calendarId:"primary",
         singleEvents:true,
@@ -42,19 +47,18 @@ export async function POST() {
         maxResults:250,
         pageToken,
         syncToken: connection.sync_token || undefined,
-        timeMin: connection.sync_token ? undefined : new Date(Date.now()-30*86400000).toISOString()
+        timeMin: initialSync ? new Date(now-30*86400000).toISOString() : undefined,
+        timeMax: initialSync ? new Date(now+365*86400000).toISOString() : undefined
       });
+
+      const rows:any[] = [];
+      const cancelledIds:string[] = [];
 
       for(const event of result.data.items || []){
         if(!event.id) continue;
 
         if(event.status==="cancelled"){
-          await supabase
-            .from("calendar_events")
-            .delete()
-            .eq("client_id",client.id)
-            .eq("external_id",event.id)
-            .eq("source","google");
+          cancelledIds.push(event.id);
           continue;
         }
 
@@ -62,7 +66,7 @@ export async function POST() {
         const end = event.end?.dateTime || event.end?.date;
         if(!start || !end) continue;
 
-        await supabase.from("calendar_events").upsert({
+        rows.push({
           client_id:client.id,
           source:"google",
           external_id:event.id,
@@ -77,23 +81,48 @@ export async function POST() {
             status:event.status,
             attendees:event.attendees?.length || 0
           }
-        }, {onConflict:"client_id,source,external_id"});
+        });
+      }
 
-        imported++;
+      if(rows.length){
+        const {error:upsertError} = await supabase
+          .from("calendar_events")
+          .upsert(rows,{onConflict:"client_id,source,external_id"});
+        if(upsertError) throw upsertError;
+        imported += rows.length;
+      }
+
+      if(cancelledIds.length){
+        const {error:deleteError} = await supabase
+          .from("calendar_events")
+          .delete()
+          .eq("client_id",client.id)
+          .eq("source","google")
+          .in("external_id",cancelledIds);
+        if(deleteError) throw deleteError;
       }
 
       pageToken = result.data.nextPageToken || undefined;
       nextSyncToken = result.data.nextSyncToken || nextSyncToken;
+      pages++;
+
+      if(pages >= 20 && pageToken){
+        return NextResponse.json({
+          error:"Sua agenda tem muitos eventos para a primeira sincronização. Tente novamente para continuar."
+        },{status:413});
+      }
     } while(pageToken);
 
-    if(nextSyncToken){
-      await supabase
-        .from("calendar_connections")
-        .update({sync_token:nextSyncToken,last_synced_at:new Date().toISOString()})
-        .eq("id",connection.id);
-    }
+    const patch:any = {last_synced_at:new Date().toISOString()};
+    if(nextSyncToken) patch.sync_token = nextSyncToken;
 
-    return NextResponse.json({ok:true,imported});
+    const {error:updateError} = await supabase
+      .from("calendar_connections")
+      .update(patch)
+      .eq("id",connection.id);
+    if(updateError) throw updateError;
+
+    return NextResponse.json({ok:true,imported,pages});
   } catch(error:any) {
     if(error?.code===410 || error?.response?.status===410){
       await supabase
@@ -102,6 +131,16 @@ export async function POST() {
         .eq("id",connection.id);
       return NextResponse.json({ok:false,resetRequired:true},{status:409});
     }
-    throw error;
+
+    const status = Number(error?.response?.status || error?.code || 500);
+    if(status===401){
+      return NextResponse.json({error:"A autorização do Google expirou. Desconecte e conecte a agenda novamente."},{status:401});
+    }
+    if(status===403){
+      return NextResponse.json({error:"O Google recusou o acesso à agenda. Confirme se a Google Calendar API está ativada e tente novamente."},{status:403});
+    }
+
+    console.error("Google Calendar sync failed", error);
+    return NextResponse.json({error:"Não foi possível sincronizar o Google Agenda agora. Tente novamente."},{status:500});
   }
 }
