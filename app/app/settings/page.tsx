@@ -2,6 +2,7 @@ import { AppShell } from "@/components/AppShell";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { GoogleCalendarCard } from "./GoogleCalendarCard";
+import { saveClientSettings } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -14,11 +15,17 @@ export default async function Settings(){
 
   const {data:client} = await supabase
     .from("clients")
-    .select("id,recording_mode,min_free_minutes")
+    .select("id,display_name,brand,segment,recording_mode,min_free_minutes")
     .eq("user_id",authData.user.id)
     .single();
 
   if(!client) redirect("/onboarding");
+
+  const {data:profile} = await supabase
+    .from("profiles")
+    .select("name")
+    .eq("id",authData.user.id)
+    .maybeSingle();
 
   const {data:connection} = await supabase
     .from("calendar_connections")
@@ -33,23 +40,34 @@ export default async function Settings(){
 
     <GoogleCalendarCard connected={!!connection}/>
 
-    <div className="card" style={{marginTop:18}}>
+    <form action={saveClientSettings} className="card" style={{marginTop:18}}>
+      <h3>Perfil da cliente</h3>
       <div className="form-grid">
+        <label>Nome
+          <input name="displayName" defaultValue={client.display_name || profile?.name || ""} placeholder="Ex.: Alice Santana" required/>
+        </label>
+        <label>Marca ou negócio
+          <input name="brand" defaultValue={client.brand || ""} placeholder="Ex.: UNA Studio Criativo"/>
+        </label>
+        <label style={{gridColumn:"1 / -1"}}>Segmento
+          <input name="segment" defaultValue={client.segment || ""} placeholder="Ex.: Marketing digital, advocacia, estética..."/>
+        </label>
         <label>Forma de gravação
-          <select defaultValue={client.recording_mode || "hybrid"}>
+          <select name="recordingMode" defaultValue={client.recording_mode || "hybrid"}>
             <option value="hybrid">Híbrida</option>
             <option value="block">Em bloco</option>
             <option value="distributed">Um pouco por dia</option>
           </select>
         </label>
         <label>Tempo mínimo
-          <select defaultValue={String(client.min_free_minutes || 15)}>
-            <option value="15">15 min</option>
+          <select name="minFree" defaultValue={String(client.min_free_minutes || 15)}>
             <option value="10">10 min</option>
+            <option value="15">15 min</option>
             <option value="20">20 min</option>
           </select>
         </label>
       </div>
-    </div>
+      <button className="btn btn-primary" style={{marginTop:16}}>Salvar alterações</button>
+    </form>
   </AppShell>;
 }
