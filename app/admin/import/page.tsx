@@ -2,7 +2,10 @@ import Link from "next/link";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { importSpreadsheet } from "./actions";
 
-export default async function ImportPage(){
+type SearchParams = Promise<{imported?:string; error?:string; message?:string}>;
+
+export default async function ImportPage({searchParams}:{searchParams:SearchParams}){
+  const params = await searchParams;
   const supabase = await createServerSupabaseClient();
   if(!supabase) return <h1>Configure o Supabase.</h1>;
 
@@ -18,12 +21,30 @@ export default async function ImportPage(){
 
   const profileNames = new Map((profiles || []).map((p:any)=>[p.id,p.name]));
 
+  const errorMessage = params.error === "no_rows"
+    ? "Não encontrei linhas de conteúdo. Confira se a planilha tem colunas como Título/Tema, Data e Formato."
+    : params.error === "db"
+      ? `O banco recusou a importação${params.message ? `: ${params.message}` : "."}`
+      : params.error
+        ? "Não foi possível importar a planilha. Confira o arquivo e tente novamente."
+        : "";
+
   return <>
     <div className="eyebrow">Importação</div>
     <h1>Importar calendário editorial.</h1>
     <p className="sub">Arquivos estruturados entram pelo parser. PDFs passam por IA e revisão humana.</p>
 
-    <div className="grid">
+    {params.imported && <div className="card" style={{marginTop:18,borderColor:"#b7c5a4"}}>
+      <strong>{params.imported} conteúdo(s) importado(s) com sucesso.</strong>
+      <div className="meta">Eles já devem aparecer em Meu mês e O que gravar.</div>
+    </div>}
+
+    {errorMessage && <div className="card" style={{marginTop:18,borderColor:"#d9a5a5"}}>
+      <strong>Importação não concluída.</strong>
+      <div className="meta">{errorMessage}</div>
+    </div>}
+
+    <div className="grid" style={{marginTop:18}}>
       <form action={importSpreadsheet} className="card half">
         <h3>CSV / XLSX</h3>
         <label>Cliente
