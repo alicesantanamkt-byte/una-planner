@@ -144,18 +144,24 @@ export async function requestRecalculation(){
     const acceptedContentIds = new Set(
       (decisions || []).filter((d:any)=>d.status==="accepted").map((d:any)=>d.content_item_id)
     );
+    const rejectedRows=(decisions || []).filter((d:any)=>d.status==="rejected" && d.content_item_id && d.start_datetime);
     const rejectedPairs = new Set(
-      (decisions || [])
-        .filter((d:any)=>d.status==="rejected" && d.content_item_id && d.start_datetime)
-        .map((d:any)=>`${d.content_item_id}|${new Date(d.start_datetime).toISOString()}`)
+      rejectedRows.map((d:any)=>`${d.content_item_id}|${new Date(d.start_datetime).toISOString()}`)
     );
+    const rejectedTimesByContent=new Map<string,Date[]>();
+    for(const row of rejectedRows){
+      const list=rejectedTimesByContent.get(row.content_item_id) || [];
+      list.push(new Date(row.start_datetime));
+      rejectedTimesByContent.set(row.content_item_id,list);
+    }
+
     const pendingContents = (contents || []).filter((c:any)=>!acceptedContentIds.has(c.id));
 
     const generated = generateSuggestions(
       pendingContents,
       events || [],
       client,
-      {rejectedPairs}
+      {rejectedPairs,rejectedTimesByContent,rejectionBufferMinutes:90}
     );
 
     const admin = createAdminSupabaseClient();
