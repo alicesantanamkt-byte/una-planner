@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { matchAssetToContent } from "@/lib/openai/match-asset";
+import { matchAssetToContents } from "@/lib/openai/match-asset";
+
+export const maxDuration = 60;
 
 export async function POST(){
   const supabase = await createServerSupabaseClient();
@@ -17,47 +19,68 @@ export async function POST(){
 
   if(!client) return NextResponse.json({error:"Cliente não encontrado."},{status:404});
 
-  const {data:assets} = await supabase
-    .from("content_assets")
-    .select("id,context,tags_json")
-    .eq("client_id",client.id)
-    .limit(30);
+  const [{data:assets,error:assetsError},{data:contents,error:contentsError}] = await Promise.all([
+    supabase
+      .from("content_assets")
+      .select("id,context,tags_json")
+      .eq("client_id",client.id)
+      .limit(30),
+    supabase
+      .from("content_items")
+      .select("id,title,metadata_json,status")
+      .eq("client_id",client.id)
+      .in("status",["pending","planned"])
+      .limit(40)
+  ]);
 
-  const {data:contents} = await supabase
-    .from("content_items")
-    .select("id,title,metadata_json,status")
-    .eq("client_id",client.id)
-    .eq("status","pending")
-    .limit(30);
-
-  const created:any[]=[];
-
-  for(const asset of assets || []){
-    for(const content of contents || []){
-      const result = await matchAssetToContent({
-        assetContext:asset.context,
-        assetTags:asset.tags_json || [],
-        contentTitle:content.title,
-        contentMetadata:content.metadata_json
-      });
-
-      if(!result || !result.should_use || result.score<70) continue;
-
-      const {data:match} = await supabase
-        .from("content_asset_matches")
-        .upsert({
-          asset_id:asset.id,
-          content_item_id:content.id,
-          score:result.score,
-          reason:result.reason,
-          suggested_usage:result.suggested_usage
-        },{onConflict:"asset_id,content_item_id"})
-        .select("*")
-        .single();
-
-      created.push(match);
-    }
+  if(assetsError || contentsError){
+    return NextResponse.json({error:"Não foi possível carregar seu banco e seus conteúdos."},{status:500});
+  }
+  if(!(assets||[]).length){
+    return NextResponse.json({error:"Seu banco de conteúdo ainda está vazio."},{status:400});
+  }
+  if(!(contents||[]).length){
+    return NextResponse.json({error:"Não há conteúdos pendentes para comparar."},{status:400});
   }
 
-  return NextResponse.json({ok:true,matches:created.length});
+  let createdCount = 0;
+
+  try{
+    for(const asset of assets || []){
+      const results = await matchAssetToContents({
+        assetContext:asset.context,
+        assetTags:Array.isArray(asset.tags_json) ? asset.tags_json : [],
+        contents:(contents || []).map(c=>({id:c.id,title:c.title,metadata_json:c.metadata_json}))
+      });
+
+      const validIds = new Set((contents || []).map(c=>c.id));
+      const rows = results
+        .filter((result:any)=>
+          result &&
+          validIds.has(result.content_id) &&
+          result.should_use === true &&
+          Number(result.score) >= 70
+        )
+        .map((result:any)=>({
+          asset_id:asset.id,
+          content_item_id:result.content_id,
+          score:Number(result.score),
+          reason:String(result.reason || ""),
+          suggested_usage:result.suggested_usage ? String(result.suggested_usage) : null
+        }));
+
+      if(rows.length){
+        const {error:upsertError} = await supabase
+          .from("content_asset_matches")
+          .upsert(rows,{onConflict:"asset_id,content_item_id"});
+        if(upsertError) throw upsertError;
+        createdCount += rows.length;
+      }
+    }
+
+    return NextResponse.json({ok:true,matches:createdCount});
+  }catch(error){
+    console.error("Asset matching failed",error);
+    return NextResponse.json({error:"A análise demorou demais ou falhou. Tente novamente."},{status:500});
+  }
 }
