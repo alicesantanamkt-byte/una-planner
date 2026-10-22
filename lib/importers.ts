@@ -68,6 +68,23 @@ function toIsoDate(value:unknown):string|undefined{
   }
 
   const raw = String(value).trim();
+
+  const brNoYear = raw.match(/^(\d{1,2})[\/-](\d{1,2})(?:\s+(\d{1,2}):(\d{2}))?$/);
+  if(brNoYear){
+    const year = new Date().getUTCFullYear();
+    const month = Number(brNoYear[2]);
+    const day = Number(brNoYear[1]);
+    const hour = brNoYear[3] ? Number(brNoYear[3]) : 12;
+    const minute = brNoYear[4] ? Number(brNoYear[4]) : 0;
+    if(month >= 1 && month <= 12 && day >= 1 && day <= 31){
+      const date = new Date(Date.UTC(year,month-1,day,hour,minute));
+      if(date.getUTCFullYear()===year && date.getUTCMonth()===month-1 && date.getUTCDate()===day){
+        return date.toISOString();
+      }
+    }
+    return undefined;
+  }
+
   const br = raw.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})(?:\s+(\d{1,2}):(\d{2}))?$/);
   if(br){
     const year = Number(br[3].length === 2 ? `20${br[3]}` : br[3]);
@@ -75,12 +92,22 @@ function toIsoDate(value:unknown):string|undefined{
     const day = Number(br[1]);
     const hour = br[4] ? Number(br[4]) : 12;
     const minute = br[5] ? Number(br[5]) : 0;
-    const date = new Date(Date.UTC(year,month-1,day,hour,minute));
-    if(!Number.isNaN(date.getTime())) return date.toISOString();
+    if(month >= 1 && month <= 12 && day >= 1 && day <= 31){
+      const date = new Date(Date.UTC(year,month-1,day,hour,minute));
+      if(date.getUTCFullYear()===year && date.getUTCMonth()===month-1 && date.getUTCDate()===day){
+        return date.toISOString();
+      }
+    }
+    return undefined;
   }
 
-  const parsed = new Date(raw);
-  return Number.isNaN(parsed.getTime()) ? undefined : parsed.toISOString();
+  const isoLike = /^\d{4}-\d{2}-\d{2}/.test(raw);
+  if(isoLike){
+    const parsed = new Date(raw);
+    return Number.isNaN(parsed.getTime()) ? undefined : parsed.toISOString();
+  }
+
+  return undefined;
 }
 
 export function parseSpreadsheet(buffer:ArrayBuffer):ImportedContent[]{
