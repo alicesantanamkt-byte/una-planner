@@ -1,6 +1,7 @@
 import "./globals.css";
 import "./sidebar-fix.css";
 import "./polish.css";
+import "./final-polish.css";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
