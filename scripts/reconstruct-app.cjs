@@ -21,7 +21,7 @@ function readHexText(...names) {
 
 const base64 = [
   readText('chunk_00.txt'),
-  readText('chunk_01.txt'),
+  readHexText('hex01_0.txt', 'hex01_1.txt'),
   readText('chunk_02.txt'),
   readText('chunk_03.txt'),
   readHexText('hex04_0.txt', 'hex04_1.txt'),
