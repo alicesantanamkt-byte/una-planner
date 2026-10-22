@@ -6,7 +6,11 @@ type ContentRow = {
 };
 type EventRow = { start_datetime:string; end_datetime:string; location:string | null; protected:boolean | null; };
 type ClientRoutine = { work_start_time?:string|null; work_end_time?:string|null; active_weekdays?:number[]|null; };
-type SuggestionOptions = { rejectedPairs?:Set<string> };
+type SuggestionOptions = {
+  rejectedPairs?:Set<string>;
+  rejectedTimesByContent?:Map<string,Date[]>;
+  rejectionBufferMinutes?:number;
+};
 
 function dateKey(date:Date){
   return new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).format(date);
@@ -14,6 +18,12 @@ function dateKey(date:Date){
 
 function rejectionKey(contentId:string,start:Date){
   return `${contentId}|${start.toISOString()}`;
+}
+
+function isNearRejectedTime(contentId:string,start:Date,options:SuggestionOptions){
+  const rejected=options.rejectedTimesByContent?.get(contentId) || [];
+  const buffer=(options.rejectionBufferMinutes || 90)*60000;
+  return rejected.some(time=>Math.abs(start.getTime()-time.getTime()) < buffer);
 }
 
 export function generateSuggestions(
@@ -34,8 +44,6 @@ export function generateSuggestions(
     routine.active_weekdays?.length?routine.active_weekdays:[1,2,3,4,5],now
   );
 
-  // Tracks how much of each free window has already been assigned to another content.
-  // This prevents multiple suggestions from overlapping at the same start time.
   const usedMinutes=new Map<number,number>();
   const rejectedPairs=options.rejectedPairs || new Set<string>();
   const results:any[]=[];
@@ -55,6 +63,7 @@ export function generateSuggestions(
       const publish=new Date(content.publish_at!);
       if(candidateStart>=publish || candidateEnd>slot.end) continue;
       if(rejectedPairs.has(rejectionKey(content.id,candidateStart))) continue;
+      if(isNearRejectedTime(content.id,candidateStart,options)) continue;
 
       const daysBefore=Math.max(0,Math.floor((+publish-+candidateStart)/86400000));
       const wanted=content.preferred_location?.trim().toLowerCase();
