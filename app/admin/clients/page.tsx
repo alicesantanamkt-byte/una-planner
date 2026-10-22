@@ -7,7 +7,7 @@ export default async function AdminClients(){
 
   const {data:clients} = await supabase
     .from("clients")
-    .select("id,brand,segment,calendar_mode,recording_mode,onboarding_completed,user_id,created_at")
+    .select("id,display_name,brand,segment,calendar_mode,recording_mode,onboarding_completed,user_id,created_at")
     .order("created_at",{ascending:false});
 
   const userIds = (clients || []).map((c:any)=>c.user_id).filter(Boolean);
@@ -25,13 +25,13 @@ export default async function AdminClients(){
     <div className="card" style={{marginTop:22}}>
       {(clients||[]).length===0 && <p className="meta">Nenhuma cliente cadastrada.</p>}
       {(clients||[]).map((c:any)=>{
-        const displayName = c.brand || profileNames.get(c.user_id) || "Cliente";
+        const displayName = c.display_name || c.brand || profileNames.get(c.user_id) || "Cliente";
         return <div className="item" key={c.id}>
           <div className="row">
             <div>
               <strong>{displayName}</strong>
               <div className="meta">
-                {c.segment || "segmento não informado"} · {c.calendar_mode || "agenda não definida"} · {c.recording_mode || "gravação não definida"}
+                {c.brand && c.brand !== displayName ? `${c.brand} · ` : ""}{c.segment || "segmento não informado"} · {c.calendar_mode || "agenda não definida"} · {c.recording_mode || "gravação não definida"}
               </div>
             </div>
             <div style={{display:"flex",gap:8,alignItems:"center"}}>
