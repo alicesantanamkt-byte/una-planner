@@ -11,6 +11,13 @@ export default async function ImportPage(){
     .select("id,brand,user_id")
     .order("created_at",{ascending:false});
 
+  const userIds = (clients || []).map((c:any)=>c.user_id).filter(Boolean);
+  const {data:profiles} = userIds.length
+    ? await supabase.from("profiles").select("id,name").in("id",userIds)
+    : {data:[] as any[]};
+
+  const profileNames = new Map((profiles || []).map((p:any)=>[p.id,p.name]));
+
   return <>
     <div className="eyebrow">Importação</div>
     <h1>Importar calendário editorial.</h1>
@@ -22,7 +29,10 @@ export default async function ImportPage(){
         <label>Cliente
           <select name="clientId" required>
             <option value="">Selecione</option>
-            {(clients||[]).map((c:any)=><option key={c.id} value={c.id}>{c.brand || c.user_id}</option>)}
+            {(clients||[]).map((c:any)=>{
+              const displayName = c.brand || profileNames.get(c.user_id) || "Cliente";
+              return <option key={c.id} value={c.id}>{displayName}</option>;
+            })}
           </select>
         </label>
         <label style={{marginTop:12}}>Arquivo
