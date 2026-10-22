@@ -117,7 +117,7 @@ export async function requestRecalculation(){
 
   if(clientError || !client) redirect("/app/suggestions?calc=error");
 
-  const [{data:contents,error:contentsError},{data:events,error:eventsError}] = await Promise.all([
+  const [{data:contents,error:contentsError},{data:events,error:eventsError},{data:decisions,error:decisionsError}] = await Promise.all([
     supabase
       .from("content_items")
       .select("id,title,publish_at,estimated_minutes,preferred_location,status")
@@ -129,14 +129,35 @@ export async function requestRecalculation(){
       .from("calendar_events")
       .select("start_datetime,end_datetime,location,protected")
       .eq("client_id",client.id)
-      .order("start_datetime",{ascending:true})
+      .order("start_datetime",{ascending:true}),
+    supabase
+      .from("suggested_slots")
+      .select("content_item_id,start_datetime,status")
+      .eq("client_id",client.id)
+      .in("status",["accepted","rejected"])
   ]);
 
-  if(contentsError || eventsError) redirect("/app/suggestions?calc=error");
+  if(contentsError || eventsError || decisionsError) redirect("/app/suggestions?calc=error");
   if(!(contents || []).length) redirect("/app/suggestions?calc=empty");
 
   try{
-    const generated = generateSuggestions(contents || [],events || [],client);
+    const acceptedContentIds = new Set(
+      (decisions || []).filter((d:any)=>d.status==="accepted").map((d:any)=>d.content_item_id)
+    );
+    const rejectedPairs = new Set(
+      (decisions || [])
+        .filter((d:any)=>d.status==="rejected" && d.content_item_id && d.start_datetime)
+        .map((d:any)=>`${d.content_item_id}|${new Date(d.start_datetime).toISOString()}`)
+    );
+    const pendingContents = (contents || []).filter((c:any)=>!acceptedContentIds.has(c.id));
+
+    const generated = generateSuggestions(
+      pendingContents,
+      events || [],
+      client,
+      {rejectedPairs}
+    );
+
     const admin = createAdminSupabaseClient();
     if(!admin) redirect("/app/suggestions?calc=error");
 
