@@ -18,6 +18,8 @@ export default async function Settings(){
     .eq("user_id",authData.user.id)
     .single();
 
+  if(!client) redirect("/onboarding");
+
   const {data:connection} = await supabase
     .from("calendar_connections")
     .select("id")

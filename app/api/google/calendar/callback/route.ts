@@ -46,6 +46,10 @@ export async function GET(request:NextRequest) {
     .eq("user_id",authData.user.id)
     .single();
 
+  if(!client) {
+    return NextResponse.redirect(new URL("/app/settings?google=client_error", process.env.APP_URL));
+  }
+
   await supabase.from("calendar_connections").upsert({
     client_id: client.id,
     provider: "google",

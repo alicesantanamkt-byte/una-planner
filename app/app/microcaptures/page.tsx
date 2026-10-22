@@ -17,6 +17,8 @@ export default async function MicrocapturesPage() {
     .eq("user_id",authData.user.id)
     .single();
 
+  if(!client) redirect("/onboarding");
+
   const {data:suggestions} = await supabase
     .from("micro_capture_suggestions")
     .select("id,suggestion_text,estimated_seconds,tags_json,status,calendar_events(title,start_datetime)")

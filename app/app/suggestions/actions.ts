@@ -108,6 +108,8 @@ export async function requestRecalculation(){
     .eq("user_id",authData.user.id)
     .single();
 
+  if(!client) throw new Error("Cliente não encontrado.");
+
   await supabase.from("alerts").insert({
     client_id:client.id,
     severity:"attention",

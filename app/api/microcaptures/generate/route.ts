@@ -18,12 +18,16 @@ export async function POST(request:NextRequest) {
     .eq("user_id",authData.user.id)
     .single();
 
+  if(!client) return NextResponse.json({error:"Cliente não encontrado."},{status:404});
+
   const {data:event} = await supabase
     .from("calendar_events")
     .select("id,title,location,capture_allowed,protected")
     .eq("id",eventId)
     .eq("client_id",client.id)
     .single();
+
+  if(!event) return NextResponse.json({error:"Evento não encontrado."},{status:404});
 
   if(event.protected || !event.capture_allowed) {
     return NextResponse.json({ok:true,skipped:true,reason:"evento protegido"});

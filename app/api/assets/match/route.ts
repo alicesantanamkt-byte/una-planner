@@ -15,6 +15,8 @@ export async function POST(){
     .eq("user_id",authData.user.id)
     .single();
 
+  if(!client) return NextResponse.json({error:"Cliente não encontrado."},{status:404});
+
   const {data:assets} = await supabase
     .from("content_assets")
     .select("id,context,tags_json")
