@@ -8,7 +8,7 @@ export default async function ImportPage(){
 
   const {data:clients} = await supabase
     .from("clients")
-    .select("id,brand,user_id")
+    .select("id,display_name,brand,user_id")
     .order("created_at",{ascending:false});
 
   const userIds = (clients || []).map((c:any)=>c.user_id).filter(Boolean);
@@ -30,7 +30,7 @@ export default async function ImportPage(){
           <select name="clientId" required>
             <option value="">Selecione</option>
             {(clients||[]).map((c:any)=>{
-              const displayName = c.brand || profileNames.get(c.user_id) || "Cliente";
+              const displayName = c.display_name || c.brand || profileNames.get(c.user_id) || "Cliente";
               return <option key={c.id} value={c.id}>{displayName}</option>;
             })}
           </select>
