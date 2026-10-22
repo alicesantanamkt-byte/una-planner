@@ -4,6 +4,9 @@ import { redirect } from "next/navigation";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export async function saveOnboarding(payload: {
+  displayName: string;
+  brand: string;
+  segment: string;
   calendarMode: string;
   start: string;
   end: string;
@@ -27,6 +30,9 @@ export async function saveOnboarding(payload: {
 
   const values = {
     user_id: user.id,
+    display_name: payload.displayName.trim(),
+    brand: payload.brand.trim() || null,
+    segment: payload.segment.trim() || null,
     calendar_mode: payload.calendarMode,
     recording_mode: payload.recordingMode,
     min_free_minutes: Number(payload.minFree),
