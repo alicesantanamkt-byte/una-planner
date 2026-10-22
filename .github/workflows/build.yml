@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -19,5 +19,16 @@ jobs:
           node-version: 22
       - name: Install dependencies
         run: npm install
+      - name: Hydrate real source tree
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app components lib supabase package.json tsconfig.json next.config.ts proxy.ts README.md BETA_CHECKLIST.md QA_TEST_PLAN.md TEST_REPORT.md
+          git add -f .env.example
+          git rm -r --ignore-unmatch archive_v2 deploy_parts scripts .ci-trigger
+          if ! git diff --cached --quiet; then
+            git commit -m "Hydrate UNA Planner source tree"
+            git push origin HEAD:build-fix
+          fi
       - name: Build
         run: npm run build
