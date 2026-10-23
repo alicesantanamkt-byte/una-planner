@@ -1,4 +1,5 @@
-import Link from "next/link";
+import "./admin.css";
+import { AdminSidebar } from "@/components/AdminSidebar";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 
@@ -17,18 +18,8 @@ export default async function AdminLayout({children}:{children:React.ReactNode})
 
   if(profile?.role!=="admin") redirect("/app");
 
-  return <div className="shell">
-    <aside className="sidebar">
-      <div className="brand">UNA</div>
-      <div className="brand-sub">operação</div>
-      <nav className="nav">
-        <Link href="/admin">Visão geral</Link>
-        <Link href="/admin/clients">Clientes</Link>
-        <Link href="/admin/import">Importar calendário</Link>
-        <Link href="/admin/suggestions">Sugestões</Link>
-        <Link href="/admin/alerts">Alertas</Link>
-      </nav>
-    </aside>
-    <main className="main">{children}</main>
+  return <div className="admin-shell">
+    <AdminSidebar/>
+    <main className="admin-main">{children}</main>
   </div>;
 }
