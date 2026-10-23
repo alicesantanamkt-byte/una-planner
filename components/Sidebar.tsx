@@ -9,7 +9,8 @@ const groups = [
     label:"Planejamento", href:"/app/month", icon:"▣",
     children:[
       {label:"Meu mês",href:"/app/month"},
-      {label:"Minha agenda",href:"/app/calendar"}
+      {label:"Minha agenda",href:"/app/calendar"},
+      {label:"Importar calendário",href:"/app/import"}
     ]
   },
   {
