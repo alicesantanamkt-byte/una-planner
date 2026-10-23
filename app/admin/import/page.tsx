@@ -9,16 +9,9 @@ export default async function ImportPage({searchParams}:{searchParams:SearchPara
   const supabase = await createServerSupabaseClient();
   if(!supabase) return <h1>Configure o Supabase.</h1>;
 
-  const {data:clients} = await supabase
-    .from("clients")
-    .select("id,display_name,brand,user_id")
-    .order("created_at",{ascending:false});
-
+  const {data:clients} = await supabase.from("clients").select("id,display_name,brand,user_id").order("created_at",{ascending:false});
   const userIds = (clients || []).map((c:any)=>c.user_id).filter(Boolean);
-  const {data:profiles} = userIds.length
-    ? await supabase.from("profiles").select("id,name").in("id",userIds)
-    : {data:[] as any[]};
-
+  const {data:profiles} = userIds.length ? await supabase.from("profiles").select("id,name").in("id",userIds) : {data:[] as any[]};
   const profileNames = new Map((profiles || []).map((p:any)=>[p.id,p.name]));
 
   const errorMessage = params.error === "no_rows"
@@ -29,37 +22,20 @@ export default async function ImportPage({searchParams}:{searchParams:SearchPara
         ? "Não foi possível importar a planilha. Confira o arquivo e tente novamente."
         : "";
 
-  const imported=Number(params.imported || 0);
-  const skipped=Number(params.skipped || 0);
-
   return <>
-    <div className="eyebrow">Importação</div>
-    <h1>Importar calendário editorial.</h1>
-    <p className="sub">Arquivos estruturados entram pelo parser. PDFs passam por IA e revisão humana.</p>
+    <div className="page-head">
+      <div><div className="eyebrow">Calendários</div><h1>Importar calendário editorial</h1><p className="sub">Adicione o planejamento da cliente sem duplicar conteúdos já existentes.</p></div>
+      <span className="pill">{(clients||[]).length} cliente(s) disponíveis</span>
+    </div>
 
-    {params.imported && <div className="card" style={{marginTop:18,borderColor:"#b7c5a4"}}>
-      <strong>{imported} conteúdo(s) novo(s) importado(s).</strong>
-      <div className="meta">
-        {skipped>0 ? `${skipped} item(ns) igual(is) já existentes foram ignorados para evitar duplicação.` : "Eles já devem aparecer em Meu mês e O que gravar."}
-      </div>
-    </div>}
+    {params.imported && <div className="notice-success"><strong>{params.imported} conteúdo(s) importado(s).</strong>{params.skipped && Number(params.skipped)>0 ? <span>{params.skipped} linha(s) já existiam e foram ignoradas.</span> : null}</div>}
+    {errorMessage && <div className="notice-soft"><strong>Importação não concluída.</strong><span>{errorMessage}</span></div>}
 
-    {errorMessage && <div className="card" style={{marginTop:18,borderColor:"#d9a5a5"}}>
-      <strong>Importação não concluída.</strong>
-      <div className="meta">{errorMessage}</div>
-    </div>}
-
-    <div className="grid" style={{marginTop:18}}>
-      <form action={importSpreadsheet} className="card half">
-        <h3>CSV / XLSX</h3>
+    <div className="admin-grid">
+      <form action={importSpreadsheet} className="card">
+        <div className="settings-card-head"><h2 className="admin-section-title">Planilha estruturada</h2><div className="admin-section-copy">Use CSV, XLSX ou XLS. O sistema compara título, formato e data antes de inserir.</div></div>
         <label>Cliente
-          <select name="clientId" required>
-            <option value="">Selecione</option>
-            {(clients||[]).map((c:any)=>{
-              const displayName = c.display_name || c.brand || profileNames.get(c.user_id) || "Cliente";
-              return <option key={c.id} value={c.id}>{displayName}</option>;
-            })}
-          </select>
+          <select name="clientId" required><option value="">Selecione a cliente</option>{(clients||[]).map((c:any)=>{const displayName=c.display_name||c.brand||profileNames.get(c.user_id)||"Cliente";return <option key={c.id} value={c.id}>{displayName}</option>;})}</select>
         </label>
         <label style={{marginTop:12}}>Arquivo
           <input name="file" type="file" accept=".csv,.xlsx,.xls" required/>
@@ -67,10 +43,20 @@ export default async function ImportPage({searchParams}:{searchParams:SearchPara
         <button className="btn btn-primary" style={{marginTop:16}}>Importar planilha</button>
       </form>
 
-      <div className="card half">
-        <h3>PDF com IA</h3>
-        <p className="meta">Ideal para calendários diagramados ou arquivos cujo layout varia de cliente para cliente.</p>
-        <Link href="/admin/import/pdf" className="btn btn-primary">Analisar PDF</Link>
+      <div className="card">
+        <div className="settings-card-head"><h2 className="admin-section-title">PDF com IA</h2><div className="admin-section-copy">Para calendários diagramados ou arquivos com estrutura variável.</div></div>
+        <p className="meta" style={{fontSize:12}}>O PDF é analisado e passa por revisão antes de entrar no calendário editorial da cliente.</p>
+        <Link href="/admin/import/pdf" className="btn btn-soft" style={{display:"inline-flex",marginTop:16}}>Analisar PDF</Link>
+      </div>
+    </div>
+
+    <div className="card" style={{marginTop:14}}>
+      <h2 className="admin-section-title">Como a importação funciona</h2>
+      <div className="admin-action-grid">
+        <div className="admin-action"><strong>1. Leia o arquivo</strong><span>Título, formato, data, duração e local preferido são identificados.</span></div>
+        <div className="admin-action"><strong>2. Evite duplicatas</strong><span>Linhas já existentes para a mesma cliente são ignoradas automaticamente.</span></div>
+        <div className="admin-action"><strong>3. Atualize o app</strong><span>Os novos conteúdos aparecem em Meu mês e entram no fluxo de produção.</span></div>
+        <div className="admin-action"><strong>4. Rode o motor</strong><span>Depois da importação, horários de gravação podem ser recalculados.</span></div>
       </div>
     </div>
   </>;
