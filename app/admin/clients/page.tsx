@@ -29,7 +29,10 @@ export default async function AdminClients(){
         <h1>Clientes</h1>
         <p className="sub">Visão operacional de onboarding, agenda, rotina e alertas.</p>
       </div>
-      <span className="pill">{(clients||[]).length} cliente(s)</span>
+      <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+        <span className="pill">{(clients||[]).length} cliente(s)</span>
+        <Link className="btn btn-primary" href="/admin/clients/new">+ Novo cliente</Link>
+      </div>
     </div>
 
     {(clients||[]).length===0 && <div className="card empty-state" style={{marginTop:20}}>Nenhuma cliente cadastrada.</div>}
